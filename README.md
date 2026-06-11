@@ -16,28 +16,33 @@ Requires Node.js 18 or newer.
 ## Quick start
 
 ```ts
-import { Pug } from 'sdk-node'
+import { Pug } from "sdk-node";
 
-const pug = new Pug({ apiKey: process.env.PUG_API_KEY!, baseUrl: 'https://pug.example.com' })
+const pug = new Pug({
+  apiKey: process.env.PUG_API_KEY!,
+  baseUrl: "https://pug.example.com",
+});
 
 // Track an event. `distinctId` (who the event is for) comes first — a server has no ambient user.
-pug.track('user_42', 'order.completed', { amount: 49.0, currency: 'USD' })
+pug.track("user_42", "order.completed", { amount: 49.0, currency: "USD" });
 
 // Well-known events get typed properties (autocomplete + validation).
-pug.track('user_42', 'feature_used', { feature_name: 'export' })
+pug.track("user_42", "feature_used", { feature_name: "export" });
 
 // Identify a profile (never throws — failures are logged).
-await pug.identify('user_42', { email: 'ada@example.com', plan: 'pro' })
+await pug.identify("user_42", { email: "ada@example.com", plan: "pro" });
 
 // Reads (require a private key; throw PugError).
-const profile = await pug.profiles.getByExternalId('user_42')
+const profile = await pug.profiles.getByExternalId("user_42");
 for await (const p of pug.profiles.list()) {
-  console.log(p.externalId)
+  console.log(p.externalId);
 }
-const trend = await pug.insights.query({ /* spec, timeRange, granularity */ })
+const trend = await pug.insights.query({
+  /* spec, timeRange, granularity */
+});
 
 // Drain on shutdown so no buffered events are lost.
-await pug.close()
+await pug.close();
 ```
 
 ## Behaviour
@@ -58,20 +63,22 @@ await pug.close()
 
 ### `new Pug(options)`
 
-| Option    | Type                      | Default           | Description                                              |
-| --------- | ------------------------- | ----------------- | -------------------------------------------------------- |
-| `apiKey`  | `string`                  | —                 | **Required.** Private project key (`prv_…`).             |
-| `baseUrl` | `string`                  | hosted endpoint   | Pug server origin.                                       |
-| `batch`   | `Partial<BatchConfig>`    | see below         | Batching overrides for the ingestion buffer.            |
-| `onError` | `(err, events) => void`   | no-op             | Dead-letter / diagnostics hook for undeliverable buffered `track()` events (`identify` failures are logged, not routed here). |
+| Option    | Type                    | Default         | Description                                                                                                                   |
+| --------- | ----------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `apiKey`  | `string`                | —               | **Required.** Private project key (`prv_…`).                                                                                  |
+| `baseUrl` | `string`                | hosted endpoint | Pug server origin.                                                                                                            |
+| `batch`   | `Partial<BatchConfig>`  | see below       | Batching overrides for the ingestion buffer.                                                                                  |
+| `onError` | `(err, events) => void` | no-op           | Dead-letter / diagnostics hook for undeliverable buffered `track()` events (`identify` failures are logged, not routed here). |
 
 ```ts
 new Pug({
-  apiKey,                 // required, prv_…
-  baseUrl,                // default: hosted endpoint
+  apiKey, // required, prv_…
+  baseUrl, // default: hosted endpoint
   batch: { maxSize: 100, maxWaitMs: 5000, maxQueueSize: 10_000 },
-  onError: (err, events) => { /* dead-letter sink */ },
-})
+  onError: (err, events) => {
+    /* dead-letter sink */
+  },
+});
 ```
 
 ### Ingestion (never throws)
