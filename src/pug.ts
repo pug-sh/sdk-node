@@ -6,7 +6,7 @@ import { type BatchConfig, type BatchedTransport, createBatchedTransport, type O
 import { toPugError } from './errors.js'
 import { log } from './logger.js'
 import { createRpcClients, type RpcClients } from './rpc.js'
-import { type JsonValue, type TrackFn, type TrackOptions, toEvent } from './track.js'
+import { formatValidationError, type JsonValue, type TrackFn, type TrackOptions, toEvent } from './track.js'
 import { createEventSink } from './transport.js'
 import { DEFAULT_ENDPOINT } from './utils.js'
 
@@ -17,7 +17,11 @@ export interface Options {
   readonly baseUrl?: string
   /** Batching overrides for the ingestion buffer. */
   readonly batch?: Partial<BatchConfig>
-  /** Dead-letter / diagnostics hook for events that could not be delivered. */
+  /**
+   * Dead-letter / diagnostics hook for buffered `track()` events that could not be delivered
+   * (permanent send failure, queue overflow, or still-undelivered at `close()`). `identify()`
+   * failures are logged, not routed here.
+   */
   readonly onError?: OnError
 }
 
@@ -95,11 +99,7 @@ export class Pug {
 
       const validation = validator.validate(IdentifyRequestSchema, req)
       if (validation.kind !== 'valid') {
-        const detail =
-          validation.kind === 'invalid'
-            ? validation.violations.map(v => `${v.field}: ${v.message}`).join(', ')
-            : String(validation.error)
-        log.error(`Invalid identify request: ${detail}`)
+        log.error(`Invalid identify request: ${formatValidationError(validation)}`)
         return
       }
 
@@ -118,7 +118,10 @@ export class Pug {
     return this.transport.flush()
   }
 
-  /** Drain and shut down. Call on graceful exit so no buffered events are lost. */
+  /**
+   * Drain and shut down; call on graceful exit. Buffered events are flushed, and anything still
+   * undeliverable is reported via `onError` (not retried). Later track/identify calls warn + drop.
+   */
   close(): Promise<void> {
     this.closed = true
     return this.transport.close()
@@ -159,8 +162,15 @@ export class Pug {
   }
 
   private async *listProfiles(req: Parameters<RpcClients['profiles']['list']>[0]) {
-    for await (const page of this.rpc.profiles.list(req)) {
-      yield* page.profiles
+    // Normalize stream errors to PugError too, so `list` honors the same read contract as the
+    // unary reads (which go through `read()`); a mid-pagination failure must not escape as a
+    // raw ConnectError the caller's `instanceof PugError` handler would miss.
+    try {
+      for await (const page of this.rpc.profiles.list(req)) {
+        yield* page.profiles
+      }
+    } catch (err) {
+      throw toPugError(err)
     }
   }
 

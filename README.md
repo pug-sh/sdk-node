@@ -46,8 +46,9 @@ await pug.close()
   drop on bad input. `track()` is non-blocking — events batch and flush by size (`maxSize`) or
   interval (`maxWaitMs`).
 - **Delivery is best-effort with retry.** Transient send failures keep events queued and retry;
-  permanent failures (4xx-equivalent gRPC codes) dead-letter via `onError`. `close()` drains and
-  reports anything still undelivered through `onError`.
+  permanent failures (a fixed set of client-error gRPC codes, plus any non-transport error)
+  dead-letter via `onError`. `close()` drains and reports anything still undelivered through
+  `onError`. `onError` covers buffered `track()` events only — `identify()` failures are logged.
 - **Reads are request/response and do throw** `PugError` — they run in your control flow, so you
   own timeout/retry. They are not auto-retried.
 - **Well-known events** have typed, validated properties; any other string `kind` is accepted as
@@ -62,7 +63,7 @@ await pug.close()
 | `apiKey`  | `string`                  | —                 | **Required.** Private project key (`prv_…`).             |
 | `baseUrl` | `string`                  | hosted endpoint   | Pug server origin.                                       |
 | `batch`   | `Partial<BatchConfig>`    | see below         | Batching overrides for the ingestion buffer.            |
-| `onError` | `(err, events) => void`   | no-op             | Dead-letter / diagnostics hook for undeliverable events. |
+| `onError` | `(err, events) => void`   | no-op             | Dead-letter / diagnostics hook for undeliverable buffered `track()` events (`identify` failures are logged, not routed here). |
 
 ```ts
 new Pug({
