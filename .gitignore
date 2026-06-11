@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Generated at build time (prebuild)
+src/version.ts
+src/well-known-events.generated.ts
+
+# Logs / coverage
+*.log
+coverage/
+.nyc_output/
+*.tsbuildinfo
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Local secrets
+.env
+.env.*

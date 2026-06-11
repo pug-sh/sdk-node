@@ -1,0 +1,53 @@
+{
+  "name": "sdk-node",
+  "version": "0.1.0",
+  "description": "Pug server-side SDK for Node.js — event tracking, profile identify, and analytics reads.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "prebuild": "echo \"export const SDK_VERSION = '$(node -p \"require('./package.json').version\")'\" > src/version.ts && node scripts/gen-well-known-events.mjs",
+    "build": "tsc",
+    "watch": "tsc -w",
+    "lint": "biome check --write .",
+    "format": "biome format --write .",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@buf/fivebits_pug.bufbuild_es": "2.12.0-20260611052207-66002d896dad.1",
+    "@bufbuild/protobuf": "^2.12.0",
+    "@bufbuild/protovalidate": "^1.1.1",
+    "@connectrpc/connect": "^2.1.1",
+    "@connectrpc/connect-node": "^2.1.1",
+    "uuidv7": "^1.1.0"
+  },
+  "keywords": [
+    "analytics",
+    "tracking",
+    "sdk",
+    "pug"
+  ],
+  "author": "Pug",
+  "license": "AGPL-3.0-or-later",
+  "devDependencies": {
+    "@biomejs/biome": "2.4.14",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.1"
+  }
+}
