@@ -98,24 +98,31 @@ export const createBatchedTransport = (
       timer = null
       void flush()
     }, maxWaitMs)
+    // Unref so a pending flush timer never keeps the Node process alive on its own; close() and
+    // flush() still drain explicitly. (Optional-chained: a no-op where unref is unavailable.)
     timer.unref?.()
   }
 
-  const sendChunk = async (chunk: Event[]): Promise<void> => {
+  // Sends one chunk. Returns the chunk if it should be retried (transient failure on an open
+  // client), or null if it was delivered or dead-lettered. The caller re-queues all retryable
+  // chunks together so a multi-chunk flush preserves event order.
+  const sendChunk = async (chunk: Event[]): Promise<Event[] | null> => {
     try {
       await inner.sendBatch(chunk)
+      return null
     } catch (err) {
       if (isPermanentError(err)) {
         log.error(`Permanent error, ${chunk.length} event(s) dropped (will NOT retry):`, err)
         safeOnError(err, chunk)
-      } else if (closed) {
+        return null
+      }
+      if (closed) {
         log.error(`Client closed, ${chunk.length} event(s) dropped after transient error:`, err)
         safeOnError(err, chunk)
-      } else {
-        log.warn('Transient error sending batch, will retry:', err)
-        buffer.unshift(...chunk)
-        scheduleFlush()
+        return null
       }
+      log.warn('Transient error sending batch, will retry:', err)
+      return chunk
     }
   }
 
@@ -130,8 +137,17 @@ export const createBatchedTransport = (
       chunks.push(batch.slice(i, i + maxSize))
     }
     const run = (async () => {
+      const failed: Event[] = []
       for (const chunk of chunks) {
-        await sendChunk(chunk)
+        const retry = await sendChunk(chunk)
+        if (retry) {
+          failed.push(...retry)
+        }
+      }
+      // Re-queue every retryable chunk in one shot, in original order, ahead of newer events.
+      if (failed.length > 0) {
+        buffer.unshift(...failed)
+        scheduleFlush()
       }
     })()
     // sendChunk is total (never rejects), but chain on both settle paths so a future

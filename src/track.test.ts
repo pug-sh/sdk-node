@@ -1,5 +1,5 @@
 import { uuidv7 } from 'uuidv7'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { toEvent } from './track.js'
 import { wellKnownSchemas } from './well-known-events.js'
 
@@ -76,5 +76,29 @@ describe('well-known events', () => {
     // `quantity` is int32; a non-integer fails proto construction/validation → drop.
     const e = toEvent('purchase', SESSION, 'user_1', { quantity: 1.5 })
     expect(e).toBeNull()
+  })
+})
+
+describe('toEvent occurTime', () => {
+  it('honors an explicit epoch-millisecond timestamp', () => {
+    const e = toEvent('my.custom', SESSION, 'user_1', {}, { timestamp: 1_700_000_000_000 })
+    expect(e?.occurTime?.seconds).toBe(1_700_000_000n)
+  })
+
+  it('preserves an explicit epoch-0 timestamp instead of treating 0 as unset', () => {
+    // Regression: `0` is falsy, so a naive `opts.timestamp && …` guard silently dropped it.
+    const e = toEvent('my.custom', SESSION, 'user_1', {}, { timestamp: 0 })
+    expect(e?.occurTime?.seconds).toBe(0n)
+  })
+
+  it('ignores an out-of-range timestamp (unit mistake) and falls back to now with a warning', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const nowSeconds = BigInt(Math.floor(Date.now() / 1000))
+    // 1.7e18 looks like nanoseconds/microseconds; it must not produce a year-55-million event.
+    const e = toEvent('my.custom', SESSION, 'user_1', {}, { timestamp: 1_700_000_000_000_000_000 })
+    expect(warn).toHaveBeenCalled()
+    expect(e?.occurTime?.seconds).toBeGreaterThanOrEqual(nowSeconds)
+    expect(e?.occurTime?.seconds).toBeLessThan(nowSeconds + 60n)
+    warn.mockRestore()
   })
 })

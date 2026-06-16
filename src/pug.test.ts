@@ -1,4 +1,6 @@
+import { Code, ConnectError } from '@connectrpc/connect'
 import { describe, expect, it, vi } from 'vitest'
+import { PugError } from './errors.js'
 import { Pug } from './pug.js'
 
 // baseUrl is never dialed: no valid event is enqueued and the buffer is empty at close().
@@ -59,5 +61,25 @@ describe('Pug', () => {
     await expect(pug.identify('user_1')).resolves.toBeUndefined()
     expect(warn).toHaveBeenCalled()
     warn.mockRestore()
+  })
+
+  it('profiles.list() surfaces stream errors as PugError, not a raw ConnectError', async () => {
+    const pug = newClient()
+    // Inject a fake streaming client that throws as soon as iteration begins.
+    ;(pug as unknown as { rpc: unknown }).rpc = {
+      profiles: {
+        list: async function* () {
+          throw new ConnectError('denied', Code.PermissionDenied)
+        },
+      },
+    }
+    let caught: unknown
+    try {
+      await pug.profiles.list().next()
+    } catch (e) {
+      caught = e
+    }
+    expect(caught).toBeInstanceOf(PugError)
+    expect((caught as PugError).code).toBe(Code.PermissionDenied)
   })
 })
