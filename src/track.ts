@@ -1,5 +1,5 @@
-import { type PropertyValue, PropertyValueSchema } from '@buf/fivebits_pug.bufbuild_es/common/v1/property_value_pb.js'
-import { type Event, EventSchema } from '@buf/fivebits_pug.bufbuild_es/sdk/events/v1/events_pb.js'
+import { type PropertyValue, PropertyValueSchema } from '@buf/pugsh_pug.bufbuild_es/common/v1/property_value_pb.js'
+import { type Event, EventSchema } from '@buf/pugsh_pug.bufbuild_es/sdk/events/v1/events_pb.js'
 import { create, type DescMessage, type MessageInitShape, type MessageShape, ScalarType } from '@bufbuild/protobuf'
 import { reflect, type ScalarValue } from '@bufbuild/protobuf/reflect'
 import { timestampFromMs, timestampNow } from '@bufbuild/protobuf/wkt'

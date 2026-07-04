@@ -1,8 +1,8 @@
-import { EventsService } from '@buf/fivebits_pug.bufbuild_es/sdk/events/v1/events_pb.js'
-import { ProfilesSDKService } from '@buf/fivebits_pug.bufbuild_es/sdk/profiles/v1/profiles_pb.js'
-import { ActivityService } from '@buf/fivebits_pug.bufbuild_es/shared/activity/v1/activity_pb.js'
-import { InsightsService } from '@buf/fivebits_pug.bufbuild_es/shared/insights/v1/insights_pb.js'
-import { ProfilesService } from '@buf/fivebits_pug.bufbuild_es/shared/profiles/v1/profiles_pb.js'
+import { EventsService } from '@buf/pugsh_pug.bufbuild_es/sdk/events/v1/events_pb.js'
+import { ProfilesSDKService } from '@buf/pugsh_pug.bufbuild_es/sdk/profiles/v1/profiles_pb.js'
+import { ActivityService } from '@buf/pugsh_pug.bufbuild_es/shared/activity/v1/activity_pb.js'
+import { InsightsService } from '@buf/pugsh_pug.bufbuild_es/shared/insights/v1/insights_pb.js'
+import { ProfilesService } from '@buf/pugsh_pug.bufbuild_es/shared/profiles/v1/profiles_pb.js'
 import { createClient } from '@connectrpc/connect'
 import { createApiTransport } from './api-transport.js'
 

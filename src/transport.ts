@@ -1,4 +1,4 @@
-import { BatchCreateRequestSchema, type Event } from '@buf/fivebits_pug.bufbuild_es/sdk/events/v1/events_pb.js'
+import { BatchCreateRequestSchema, type Event } from '@buf/pugsh_pug.bufbuild_es/sdk/events/v1/events_pb.js'
 import { create } from '@bufbuild/protobuf'
 import type { EventSink } from './batch.js'
 import type { RpcClients } from './rpc.js'
