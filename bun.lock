@@ -5,7 +5,7 @@
     "": {
       "name": "sdk-node",
       "dependencies": {
-        "@buf/fivebits_pug.bufbuild_es": "2.12.0-20260611052207-66002d896dad.1",
+        "@buf/pugsh_pug.bufbuild_es": "2.12.1-20260703054414-34cac42a0ae0.1",
         "@bufbuild/protobuf": "^2.12.0",
         "@bufbuild/protovalidate": "^1.1.1",
         "@connectrpc/connect": "^2.1.1",
@@ -39,9 +39,9 @@
 
     "@biomejs/cli-win32-x64": ["@biomejs/cli-win32-x64@2.4.14", "", { "os": "win32", "cpu": "x64" }, "sha512-WL0EG5qE+EAKomGXbf2g6VnSKJhTL3tXC0QRzWRwA5VpjxNYa6H4P7ZWfymbGE4IhZZQi1KXQ2R0YjwInmz2fA=="],
 
-    "@buf/bufbuild_protovalidate.bufbuild_es": ["@buf/bufbuild_protovalidate.bufbuild_es@2.12.0-20251209175733-2a1774d88802.1", "https://buf.build/gen/npm/v1/@buf/bufbuild_protovalidate.bufbuild_es/-/bufbuild_protovalidate.bufbuild_es-2.12.0-20251209175733-2a1774d88802.1.tgz", { "peerDependencies": { "@bufbuild/protobuf": "^2.12.0" } }, ""],
+    "@buf/bufbuild_protovalidate.bufbuild_es": ["@buf/bufbuild_protovalidate.bufbuild_es@2.12.1-20251209175733-2a1774d88802.1", "https://buf.build/gen/npm/v1/@buf/bufbuild_protovalidate.bufbuild_es/-/bufbuild_protovalidate.bufbuild_es-2.12.1-20251209175733-2a1774d88802.1.tgz", { "peerDependencies": { "@bufbuild/protobuf": "^2.12.1" } }, ""],
 
-    "@buf/fivebits_pug.bufbuild_es": ["@buf/fivebits_pug.bufbuild_es@2.12.0-20260611052207-66002d896dad.1", "https://buf.build/gen/npm/v1/@buf/fivebits_pug.bufbuild_es/-/fivebits_pug.bufbuild_es-2.12.0-20260611052207-66002d896dad.1.tgz", { "dependencies": { "@buf/bufbuild_protovalidate.bufbuild_es": "2.12.0-20251209175733-2a1774d88802.1" }, "peerDependencies": { "@bufbuild/protobuf": "^2.12.0" } }, ""],
+    "@buf/pugsh_pug.bufbuild_es": ["@buf/pugsh_pug.bufbuild_es@2.12.1-20260703054414-34cac42a0ae0.1", "https://buf.build/gen/npm/v1/@buf/pugsh_pug.bufbuild_es/-/pugsh_pug.bufbuild_es-2.12.1-20260703054414-34cac42a0ae0.1.tgz", { "dependencies": { "@buf/bufbuild_protovalidate.bufbuild_es": "2.12.1-20251209175733-2a1774d88802.1" }, "peerDependencies": { "@bufbuild/protobuf": "^2.12.1" } }, ""],
 
     "@bufbuild/cel": ["@bufbuild/cel@0.4.0", "", { "dependencies": { "@bufbuild/cel-spec": "0.4.0" }, "peerDependencies": { "@bufbuild/protobuf": "^2.6.2" } }, "sha512-CdW/JgiTJCYXqnwuaJRo7NcoYhR37AaF58MMiog0/t8nudn86ZyLXYaA1f2yGhm2U17h8pKGZNksTHVSTcpmAw=="],
 

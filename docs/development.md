@@ -9,7 +9,7 @@ Internal guide for working on `sdk-node`. End-user docs live in the [README](../
 - **[tsc](https://www.typescriptlang.org)** — type-checking and the published build (`dist/`).
 - **[vitest](https://vitest.dev)** — test runner.
 
-Protobuf types are pulled from the hosted BSR package `@buf/fivebits_pug.bufbuild_es` — there is
+Protobuf types are pulled from the hosted BSR package `@buf/pugsh_pug.bufbuild_es` — there is
 **no local proto codegen**.
 
 ## Setup
@@ -20,7 +20,7 @@ bun install   # or: npm install
 
 No auth token is required. The `@buf` scope resolves to the Buf Schema Registry's
 generated-SDK npm registry (`.npmrc` maps `@buf:registry=https://buf.build/gen/npm/v1/`),
-and the `fivebits/pug` module is **public** — it installs anonymously.
+and the `pugsh/pug` module is **public** — it installs anonymously.
 
 > **Do not** add an `_authToken` line to `.npmrc` for this. With an unset/empty token, npm
 > sends an empty bearer header and the registry rejects it with `401`, whereas a tokenless
@@ -70,7 +70,7 @@ At runtime, `track()` looks up the kind in this map: known kinds get their prope
 against the proto schema (with int-vs-double and other scalar types preserved from the field
 definition), and unknown kinds fall back to the loose-property heuristic.
 
-Bumping the `@buf/fivebits_pug.bufbuild_es` version in `package.json` and rerunning the generator
+Bumping the `@buf/pugsh_pug.bufbuild_es` version in `package.json` and rerunning the generator
 is how the catalog stays in sync with the schema.
 
 ## Source layout
