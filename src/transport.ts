@@ -1,6 +1,6 @@
-import { BatchCreateRequestSchema, type Event } from '@buf/pugsh_pug.bufbuild_es/sdk/events/v1/events_pb.js'
 import { create } from '@bufbuild/protobuf'
 import type { EventSink } from './batch.js'
+import { BatchCreateRequestSchema, type Event } from './gen/sdk/events/v1/events_pb.js'
 import type { RpcClients } from './rpc.js'
 
 /** Wraps the EventsService client as the sink the batch transport drains into. */

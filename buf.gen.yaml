@@ -1,0 +1,15 @@
+# Generates protobuf-es TypeScript for the SDK wire protos (services + PropertyValue), the
+# well-known-event *Properties schemas, and the server-only shared/** services this SDK uses.
+# Output is committed to src/gen and compiled by tsc like the rest of src/.
+#
+# google/protobuf/* resolve from @bufbuild/protobuf/wkt at runtime and are not emitted.
+# buf/validate/* IS emitted — the pug protos import its field-option extensions
+# (file_buf_validate_validate) via a relative path, so it must be generated alongside.
+version: v2
+clean: true
+plugins:
+  - local: protoc-gen-es
+    out: src/gen
+    opt:
+      - target=ts
+      - import_extension=js
