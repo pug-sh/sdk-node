@@ -4,6 +4,11 @@
 
 .PHONY: sync-protos protos typed-events check-codegen proto-latest build lint test check ci
 
+# These recipes have order-only dependencies that make's prerequisite lists don't fully express
+# (e.g. `ci` must run `protos` before `check-codegen` diffs src/gen, and `protos` rewrites files
+# `build` reads). Keep everything serial even under `make -jN` so a parallel run can't race.
+.NOTPARALLEL:
+
 # BSR module + pinned commit that proto/ is vendored from. The pin makes `make sync-protos`
 # reproducible and taking newer upstream protos a deliberate, reviewable change — builds and CI
 # never touch BSR (proto/ + src/gen are committed). To bump: run `make proto-latest` for the
@@ -42,10 +47,13 @@ typed-events:
 	node scripts/gen-well-known-events.mjs
 	rm -rf .codegen-tmp
 
-# CI gate: committed typed-event codegen must match a fresh generate.
+# CI gate: the whole committed generated tree must match a fresh generate — both the protobuf-es
+# output (src/gen, rewritten by `protos`) and the derived typed-event registry. In `ci`, `protos`
+# runs first (ordering guaranteed by .NOTPARALLEL), so this diff catches drift in either one; a
+# change under sdk/**, shared/**, or a non-event common/** schema no longer slips through unseen.
 check-codegen: typed-events
-	@git diff --exit-code -- src/well-known-events.generated.ts \
-	  || { echo "codegen drift — run 'make typed-events' and commit"; exit 1; }
+	@git diff --exit-code -- src/gen src/well-known-events.generated.ts \
+	  || { echo "codegen drift — run 'make protos' and commit"; exit 1; }
 
 # Print the newest commit on the module's main branch, to update PROTO_COMMIT above.
 proto-latest:
