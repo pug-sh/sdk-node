@@ -1,10 +1,10 @@
-import { EventsService } from '@buf/fivebits_pug.bufbuild_es/sdk/events/v1/events_pb.js'
-import { ProfilesSDKService } from '@buf/fivebits_pug.bufbuild_es/sdk/profiles/v1/profiles_pb.js'
-import { ActivityService } from '@buf/fivebits_pug.bufbuild_es/shared/activity/v1/activity_pb.js'
-import { InsightsService } from '@buf/fivebits_pug.bufbuild_es/shared/insights/v1/insights_pb.js'
-import { ProfilesService } from '@buf/fivebits_pug.bufbuild_es/shared/profiles/v1/profiles_pb.js'
 import { createClient } from '@connectrpc/connect'
 import { createApiTransport } from './api-transport.js'
+import { EventsService } from './gen/sdk/events/v1/events_pb.js'
+import { ProfilesSDKService } from './gen/sdk/profiles/v1/profiles_pb.js'
+import { ActivityService } from './gen/shared/activity/v1/activity_pb.js'
+import { InsightsService } from './gen/shared/insights/v1/insights_pb.js'
+import { ProfilesService } from './gen/shared/profiles/v1/profiles_pb.js'
 
 /** One transport shared across the ingestion (sdk.*) and read (shared.*) services. */
 export const createRpcClients = (endpoint: string, apiKey: string) => {

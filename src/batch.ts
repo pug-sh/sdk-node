@@ -1,5 +1,5 @@
-import type { Event } from '@buf/fivebits_pug.bufbuild_es/sdk/events/v1/events_pb.js'
 import { ConnectError } from '@connectrpc/connect'
+import type { Event } from './gen/sdk/events/v1/events_pb.js'
 import { log } from './logger.js'
 
 export interface BatchConfig {

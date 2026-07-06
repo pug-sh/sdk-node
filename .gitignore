@@ -21,3 +21,6 @@ coverage/
 # Local secrets
 .env
 .env.*
+
+# Codegen temp (make typed-events)
+.codegen-tmp/
