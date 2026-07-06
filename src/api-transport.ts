@@ -1,4 +1,4 @@
-import type { Interceptor, Transport } from '@connectrpc/connect'
+import type { Transport } from '@connectrpc/connect'
 import { createConnectTransport } from '@connectrpc/connect-node'
 import { DEFAULT_TIMEOUT_MS } from './utils.js'
 
@@ -8,18 +8,16 @@ export const createApiTransport = (
   apiKey: string,
   opts?: { defaultTimeoutMs?: number },
 ): Transport => {
-  const interceptors: Interceptor[] = [
-    next => async req => {
-      req.header.set('x-api-key', apiKey)
-      return next(req)
-    },
-  ]
-
   return createConnectTransport({
     baseUrl: endpoint,
     httpVersion: '1.1',
     defaultTimeoutMs: opts?.defaultTimeoutMs ?? DEFAULT_TIMEOUT_MS,
-    interceptors,
+    interceptors: [
+      next => async req => {
+        req.header.set('x-api-key', apiKey)
+        return next(req)
+      },
+    ],
     useBinaryFormat: true,
   })
 }

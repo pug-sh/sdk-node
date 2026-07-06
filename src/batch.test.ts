@@ -166,6 +166,28 @@ describe('createBatchedTransport', () => {
     err.mockRestore()
   })
 
+  it('preserves event order when several chunks fail transiently in one flush', async () => {
+    let failing = true
+    const sent: unknown[][] = []
+    const sink: EventSink = {
+      sendBatch: async b => {
+        if (failing) {
+          throw new ConnectError('unavailable', Code.Unavailable)
+        }
+        sent.push(b as unknown[])
+      },
+    }
+    const t = createBatchedTransport(sink, { maxSize: 2, maxWaitMs: 10_000, maxQueueSize: 99 }, () => {})
+    t.send(ev(1))
+    t.send(ev(2)) // auto-flush: chunk [1,2] fails transiently → re-queued
+    await t.flush() // settle the in-flight attempt (buffer is empty, so this just awaits it)
+    t.send(ev(3)) // buffer [1,2,3] → auto-flush splits into [1,2] and [3]; both fail in one run
+    await t.flush() // settle: both chunks re-queue — order must stay [1,2,3], not [3,1,2]
+    failing = false
+    await t.flush() // drain successfully
+    expect(sent).toEqual([[ev(1), ev(2)], [ev(3)]])
+  })
+
   it('contains a throwing onError callback instead of propagating it', () => {
     const err = vi.spyOn(console, 'error').mockImplementation(() => {})
     const sink: EventSink = { sendBatch: async () => {} }

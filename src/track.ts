@@ -21,6 +21,14 @@ const validator = createValidator()
 
 const isWellKnownEvent = (kind: string): kind is WellKnownEventName => kind in wellKnownSchemas
 
+/** Renders a protovalidate failure result as a single human-readable string for logging. */
+export const formatValidationError = (result: ReturnType<typeof validator.validate>): string =>
+  result.kind === 'invalid'
+    ? result.violations.map(v => `${v.field}: ${v.message}`).join(', ')
+    : result.kind === 'error'
+      ? String(result.error)
+      : ''
+
 // proto's `string.max_len` limits to 1024 *code points*; we cap at 1024 *bytes* instead.
 // A UTF-8 byte count is always >= the code-point count, so a 1024-byte cap yields <= 1024
 // code points — strictly more conservative than the proto limit, never looser.
@@ -169,7 +177,7 @@ const validateWellKnownProps = <Desc extends DescMessage>(
   if (result.kind !== 'valid') {
     log.error(
       `Event "${kind}" dropped: properties validation failed for "${schema.typeName}":`,
-      result.kind === 'invalid' ? result.violations.map(v => `${v.field}: ${v.message}`).join(', ') : result.error,
+      formatValidationError(result),
     )
     return { ok: false }
   }
@@ -219,6 +227,27 @@ const mapPropsViaHeuristic = (
   }
 }
 
+// Proto Timestamp tops out at year 9999; a value past it (or negative/fractional) is almost
+// certainly a unit mistake — seconds or microseconds passed where epoch milliseconds are expected.
+const MAX_OCCUR_TIME_MS = 253_402_300_799_000
+
+/**
+ * Resolves an event's occurrence time. An explicit `timestamp` is honored only when it is a
+ * non-negative integer epoch-millisecond value within the proto Timestamp range — so `0` (the Unix
+ * epoch) is preserved, while a negative, fractional, or out-of-range value is logged and falls back
+ * to the current time rather than silently producing a bogus time or throwing in `timestampFromMs`.
+ */
+const resolveOccurTime = (timestamp?: number) => {
+  if (timestamp === undefined) {
+    return timestampNow()
+  }
+  if (Number.isInteger(timestamp) && timestamp >= 0 && timestamp <= MAX_OCCUR_TIME_MS) {
+    return timestampFromMs(timestamp)
+  }
+  log.warn(`Ignoring invalid track timestamp ${timestamp}; expected epoch milliseconds. Using current time.`)
+  return timestampNow()
+}
+
 /**
  * Builds and validates an Event for ingestion. Returns null (and logs) on any validation
  * failure so the caller can drop the event without throwing.
@@ -256,7 +285,7 @@ export const toEvent = (
       kind,
       sessionId,
       distinctId,
-      occurTime: opts?.timestamp && Number.isFinite(opts.timestamp) ? timestampFromMs(opts.timestamp) : timestampNow(),
+      occurTime: resolveOccurTime(opts?.timestamp),
     })
   } catch (err) {
     log.error(`Event "${kind}" dropped: failed to create Event proto:`, err)
@@ -266,10 +295,7 @@ export const toEvent = (
   const result = validator.validate(EventSchema, event)
   if (result.kind !== 'valid') {
     const source = isWellKnownEvent(kind) ? 'well-known' : 'custom'
-    log.error(
-      `Event "${kind}" (${source}) failed Event-level validation:`,
-      result.kind === 'invalid' ? result.violations.map(v => `${v.field}: ${v.message}`).join(', ') : result.error,
-    )
+    log.error(`Event "${kind}" (${source}) failed Event-level validation:`, formatValidationError(result))
     return null
   }
 
