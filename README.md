@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://app.pug.sh/logo.svg" alt="Pug" width="120" height="120" />
+</p>
+
 # @pug-sh/node
 
 Pug server-side SDK for Node.js — event tracking, profile identify, and analytics reads.
