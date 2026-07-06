@@ -1,6 +1,6 @@
 {
   "name": "@pug-sh/node",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Pug server-side SDK for Node.js — event tracking, profile identify, and analytics reads.",
   "type": "module",
   "main": "dist/index.js",
@@ -54,7 +54,7 @@
     "pug"
   ],
   "author": "pug.sh",
-  "license": "AGPL-3.0-or-later",
+  "license": "MIT",
   "devDependencies": {
     "@biomejs/biome": "2.4.14",
     "@bufbuild/protoc-gen-es": "^2.12.1",
