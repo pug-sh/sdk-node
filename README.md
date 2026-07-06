@@ -1,4 +1,4 @@
-# sdk-node
+# @pug-sh/node
 
 Pug server-side SDK for Node.js — event tracking, profile identify, and analytics reads.
 
@@ -8,7 +8,7 @@ never throws, so a tracking call can't take down your request path.
 ## Install
 
 ```bash
-npm install sdk-node   # or: bun add sdk-node / pnpm add sdk-node / yarn add sdk-node
+npm install @pug-sh/node   # or: bun add @pug-sh/node / pnpm add @pug-sh/node / yarn add @pug-sh/node
 ```
 
 Requires Node.js 18 or newer.
@@ -16,7 +16,7 @@ Requires Node.js 18 or newer.
 ## Quick start
 
 ```ts
-import { Pug } from "sdk-node";
+import { Pug } from "@pug-sh/node";
 
 const pug = new Pug({
   apiKey: process.env.PUG_API_KEY!,

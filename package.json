@@ -1,6 +1,6 @@
 {
-  "name": "sdk-node",
-  "version": "0.1.0",
+  "name": "@pug-sh/node",
+  "version": "0.0.1",
   "description": "Pug server-side SDK for Node.js — event tracking, profile identify, and analytics reads.",
   "type": "module",
   "main": "dist/index.js",
@@ -19,9 +19,21 @@
   "engines": {
     "node": ">=18"
   },
+  "homepage": "https://pug.sh",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pug-sh/sdk-node.git"
+  },
+  "bugs": {
+    "url": "https://github.com/pug-sh/sdk-node/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "prebuild": "echo \"export const SDK_VERSION = '$(node -p \"require('./package.json').version\")'\" > src/version.ts",
     "build": "tsc",
+    "prepublishOnly": "npm run build",
     "watch": "tsc -w",
     "lint": "biome check --write .",
     "format": "biome format --write .",
@@ -41,7 +53,7 @@
     "sdk",
     "pug"
   ],
-  "author": "Pug",
+  "author": "pug.sh",
   "license": "AGPL-3.0-or-later",
   "devDependencies": {
     "@biomejs/biome": "2.4.14",
