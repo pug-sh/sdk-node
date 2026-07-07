@@ -87,7 +87,7 @@ definition), and unknown kinds fall back to the loose-property heuristic.
 - Tests live next to the code as `*.test.ts` and run through real `protovalidate` (the validator
   is not mocked), so they exercise the actual validation contract.
 - Network is never dialed in unit tests — the batch transport is driven through a fake
-  `EventSink`, and client tests point `baseUrl` at `http://localhost:1` and only exercise the
+  `EventSink`, and client tests point `endpoint` at `http://localhost:1` and only exercise the
   client-side guard/validation paths that return before any send.
 - The throw-free ingestion contract is asserted with `expect(...).not.toThrow()` plus
   console spies that confirm the failure was logged.

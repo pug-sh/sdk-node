@@ -3,13 +3,13 @@ import { describe, expect, it, vi } from 'vitest'
 import { PugError } from './errors.js'
 import { Pug } from './pug.js'
 
-// baseUrl is never dialed: no valid event is enqueued and the buffer is empty at close().
-const newClient = () => new Pug({ apiKey: 'prv_test', baseUrl: 'http://localhost:1' })
+// endpoint is never dialed: no valid event is enqueued and the buffer is empty at close().
+const newClient = () => new Pug({ apiKey: 'prv_test', endpoint: 'http://localhost:1' })
 
 describe('Pug', () => {
   it('requires an apiKey', () => {
     // @ts-expect-error testing runtime guard
-    expect(() => new Pug({ baseUrl: 'http://localhost:1' })).toThrow(/apiKey/)
+    expect(() => new Pug({ endpoint: 'http://localhost:1' })).toThrow(/apiKey/)
   })
 
   it('track() is throw-free on invalid distinctId', () => {
@@ -34,7 +34,7 @@ describe('Pug', () => {
   })
 
   it('rejects an apiKey that is not a private (prv_) key', () => {
-    expect(() => new Pug({ apiKey: 'pub_test', baseUrl: 'http://localhost:1' })).toThrow(/private key/)
+    expect(() => new Pug({ apiKey: 'pub_test', endpoint: 'http://localhost:1' })).toThrow(/private key/)
   })
 
   it('identify() is throw-free and logs on invalid externalId', async () => {

@@ -24,7 +24,7 @@ import { Pug } from "@pug-sh/node";
 
 const pug = new Pug({
   apiKey: process.env.PUG_API_KEY!,
-  baseUrl: "https://pug.example.com",
+  endpoint: "https://pug.example.com",
 });
 
 // Track an event. `distinctId` (who the event is for) comes first — a server has no ambient user.
@@ -67,17 +67,17 @@ await pug.close();
 
 ### `new Pug(options)`
 
-| Option    | Type                    | Default         | Description                                                                                                                   |
-| --------- | ----------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `apiKey`  | `string`                | —               | **Required.** Private project key (`prv_…`).                                                                                  |
-| `baseUrl` | `string`                | hosted endpoint | Pug server origin.                                                                                                            |
-| `batch`   | `Partial<BatchConfig>`  | see below       | Batching overrides for the ingestion buffer.                                                                                  |
-| `onError` | `(err, events) => void` | no-op           | Dead-letter / diagnostics hook for undeliverable buffered `track()` events (`identify` failures are logged, not routed here). |
+| Option     | Type                    | Default         | Description                                                                                                                   |
+| ---------- | ----------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `apiKey`   | `string`                | —               | **Required.** Private project key (`prv_…`).                                                                                  |
+| `endpoint` | `string`                | hosted endpoint | Pug server origin.                                                                                                            |
+| `batch`    | `Partial<BatchConfig>`  | see below       | Batching overrides for the ingestion buffer.                                                                                  |
+| `onError`  | `(err, events) => void` | no-op           | Dead-letter / diagnostics hook for undeliverable buffered `track()` events (`identify` failures are logged, not routed here). |
 
 ```ts
 new Pug({
   apiKey, // required, prv_…
-  baseUrl, // default: hosted endpoint
+  endpoint, // default: hosted endpoint
   batch: { maxSize: 100, maxWaitMs: 5000, maxQueueSize: 10_000 },
   onError: (err, events) => {
     /* dead-letter sink */

@@ -14,7 +14,7 @@ export interface Options {
   /** Project API key. Server SDKs use a private key (`prv_…`). */
   readonly apiKey: string
   /** Pug server origin. Defaults to the hosted endpoint. */
-  readonly baseUrl?: string
+  readonly endpoint?: string
   /** Batching overrides for the ingestion buffer. */
   readonly batch?: Partial<BatchConfig>
   /**
@@ -46,9 +46,9 @@ export class Pug {
     if (!options.apiKey.startsWith('prv_')) {
       throw new Error('[Pug SDK] apiKey must be a private key (prv_…) for the server SDK')
     }
-    const baseUrl = options.baseUrl || DEFAULT_ENDPOINT
+    const endpoint = options.endpoint || DEFAULT_ENDPOINT
 
-    this.rpc = createRpcClients(baseUrl, options.apiKey)
+    this.rpc = createRpcClients(endpoint, options.apiKey)
     this.transport = createBatchedTransport(createEventSink(this.rpc.events), options.batch, options.onError)
   }
 
