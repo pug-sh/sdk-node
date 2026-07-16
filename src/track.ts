@@ -280,6 +280,7 @@ export const toEvent = (
       autoProperties: {
         $lib: makeStringValue('pug-node'),
         $sdkVersion: makeStringValue(SDK_VERSION),
+        $platform: makeStringValue('server'),
       },
       customProperties,
       kind,
