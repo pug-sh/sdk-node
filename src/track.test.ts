@@ -29,6 +29,7 @@ describe('toEvent (custom events)', () => {
     const e = toEvent('my.custom', SESSION, 'user_1')
     expect(e?.autoProperties.$lib.value.case).toBe('stringValue')
     expect(e?.autoProperties.$sdkVersion.value.case).toBe('stringValue')
+    expect(e?.autoProperties.$platform.value.value).toBe('server')
   })
 
   it('returns null when the event fails validation (non-UUID sessionId)', () => {
