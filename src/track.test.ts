@@ -80,6 +80,14 @@ describe('well-known events', () => {
   })
 })
 
+// A kind matching an Object.prototype member would otherwise resolve to the inherited
+// function and throw out of toEvent, which is documented to return null instead.
+it('treats a prototype-named kind as a custom event', () => {
+  const e = toEvent('toString', SESSION, 'user_1', { a: 1 })
+  expect(e?.kind).toBe('toString')
+  expect(e?.customProperties.a.value.value).toBe(1n)
+})
+
 describe('toEvent occurTime', () => {
   it('honors an explicit epoch-millisecond timestamp', () => {
     const e = toEvent('my.custom', SESSION, 'user_1', {}, { timestamp: 1_700_000_000_000 })

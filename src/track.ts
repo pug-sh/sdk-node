@@ -26,7 +26,7 @@ export type {
 
 const validator = createValidator()
 
-const isWellKnownEvent = (kind: string): kind is WellKnownEventName => kind in wellKnownSchemas
+const isWellKnownEvent = (kind: string): kind is WellKnownEventName => Object.hasOwn(wellKnownSchemas, kind)
 
 /** Renders a protovalidate failure result as a single human-readable string for logging. */
 export const formatValidationError = (result: ReturnType<typeof validator.validate>): string =>
