@@ -199,6 +199,15 @@ describe('toEvent location', () => {
     warn.mockRestore()
   })
 
+  // `in` would match these off Object.prototype and skip the warning.
+  it('warns about a key that shadows a prototype member', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const e = location({ country: 'DE', toString: 'Berlin' })
+    expect(e?.autoProperties.$country.value.value).toBe('DE')
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('unknown location field "toString"'))
+    warn.mockRestore()
+  })
+
   it('warns when location is not an object', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const e = location('Berlin')

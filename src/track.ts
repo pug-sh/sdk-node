@@ -306,7 +306,7 @@ const locationProps = (location: EventLocation | undefined, kind: string): Recor
   }
 
   for (const key of Object.keys(location)) {
-    if (!(key in LOCATION_FIELDS)) {
+    if (!Object.hasOwn(LOCATION_FIELDS, key)) {
       log.warn(`Ignoring unknown location field "${key}" on event "${kind}"; expected one of ${LOCATION_FIELD_NAMES}`)
     }
   }
