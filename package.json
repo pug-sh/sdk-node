@@ -31,7 +31,7 @@
     "access": "public"
   },
   "scripts": {
-    "prebuild": "echo \"export const SDK_VERSION = '$(node -p \"require('./package.json').version\")'\" > src/version.ts",
+    "prebuild": "echo \"export const SDK_VERSION = '$(bun --print \"require('./package.json').version\")'\" > src/version.ts",
     "build": "tsc",
     "prepublishOnly": "npm run build",
     "watch": "tsc -w",

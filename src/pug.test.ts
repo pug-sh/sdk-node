@@ -82,4 +82,16 @@ describe('Pug', () => {
     expect(caught).toBeInstanceOf(PugError)
     expect((caught as PugError).code).toBe(Code.PermissionDenied)
   })
+
+  it('track() carries options through to the event', () => {
+    const pug = newClient()
+    const sent: { autoProperties: Record<string, { value: { value: unknown } }>; occurTime: unknown }[] = []
+    ;(pug as unknown as { transport: unknown }).transport = { send: (e: never) => sent.push(e) }
+
+    pug.track('user_1', 'my.custom', undefined, { timestamp: 0, location: { country: 'DE' } })
+
+    expect(sent).toHaveLength(1)
+    expect(sent[0]?.autoProperties.$country.value.value).toBe('DE')
+    expect(sent[0]?.occurTime).toMatchObject({ seconds: 0n })
+  })
 })

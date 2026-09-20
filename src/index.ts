@@ -3,4 +3,10 @@ export type { BatchConfig, OnError } from './batch.js'
 export { PugError } from './errors.js'
 export type { IdentifyOptions, Options } from './pug.js'
 export { Pug } from './pug.js'
-export type { TrackFn, TrackOptions, WellKnownEventName, WellKnownEventPropsMap } from './track.js'
+export type {
+  EventLocation,
+  TrackFn,
+  TrackOptions,
+  WellKnownEventName,
+  WellKnownEventPropsMap,
+} from './track.js'

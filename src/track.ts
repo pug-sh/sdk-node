@@ -7,9 +7,16 @@ import { type PropertyValue, PropertyValueSchema } from './gen/common/v1/propert
 import { type Event, EventSchema } from './gen/sdk/events/v1/events_pb.js'
 import { log } from './logger.js'
 import { SDK_VERSION } from './version.js'
-import { type JsonValue, type TrackOptions, type WellKnownEventName, wellKnownSchemas } from './well-known-events.js'
+import {
+  type EventLocation,
+  type JsonValue,
+  type TrackOptions,
+  type WellKnownEventName,
+  wellKnownSchemas,
+} from './well-known-events.js'
 
 export type {
+  EventLocation,
   JsonValue,
   TrackFn,
   TrackOptions,
@@ -19,7 +26,7 @@ export type {
 
 const validator = createValidator()
 
-const isWellKnownEvent = (kind: string): kind is WellKnownEventName => kind in wellKnownSchemas
+const isWellKnownEvent = (kind: string): kind is WellKnownEventName => Object.hasOwn(wellKnownSchemas, kind)
 
 /** Renders a protovalidate failure result as a single human-readable string for logging. */
 export const formatValidationError = (result: ReturnType<typeof validator.validate>): string =>
@@ -231,12 +238,7 @@ const mapPropsViaHeuristic = (
 // certainly a unit mistake — seconds or microseconds passed where epoch milliseconds are expected.
 const MAX_OCCUR_TIME_MS = 253_402_300_799_000
 
-/**
- * Resolves an event's occurrence time. An explicit `timestamp` is honored only when it is a
- * non-negative integer epoch-millisecond value within the proto Timestamp range — so `0` (the Unix
- * epoch) is preserved, while a negative, fractional, or out-of-range value is logged and falls back
- * to the current time rather than silently producing a bogus time or throwing in `timestampFromMs`.
- */
+/** `0` (the Unix epoch) is a real timestamp; anything out of range falls back rather than throwing. */
 const resolveOccurTime = (timestamp?: number) => {
   if (timestamp === undefined) {
     return timestampNow()
@@ -246,6 +248,118 @@ const resolveOccurTime = (timestamp?: number) => {
   }
   log.warn(`Ignoring invalid track timestamp ${timestamp}; expected epoch milliseconds. Using current time.`)
   return timestampNow()
+}
+
+type LocationFieldType<T> = NonNullable<T> extends number ? 'number' : NonNullable<T> extends string ? 'string' : never
+
+const LOCATION_FIELDS: { readonly [K in keyof EventLocation]-?: LocationFieldType<EventLocation[K]> } = {
+  continent: 'string',
+  country: 'string',
+  region: 'string',
+  city: 'string',
+  postalCode: 'string',
+  metroCode: 'string',
+  timezone: 'string',
+  latitude: 'number',
+  longitude: 'number',
+}
+
+const LOCATION_FIELD_NAMES = Object.keys(LOCATION_FIELDS).join(', ')
+
+// Mirrors internal/geo/countries.go. The server stores $country unvalidated and only the
+// choropleth filters it, so a bad code is aggregated into a permanent rollup dimension and
+// then simply missing from the map. "XX" — Cloudflare's unknown — passes a two-letter check.
+const COUNTRY_CODES = new Set(
+  (
+    'AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ ' +
+    'BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR ' +
+    'CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR ' +
+    'GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU ' +
+    'ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ ' +
+    'LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ ' +
+    'MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF ' +
+    'PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI ' +
+    'SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR ' +
+    'TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS XK YE YT ZA ZM ZW'
+  ).split(' '),
+)
+
+// jsValueToPropertyValue files a whole number as an int, a different Variant slot from the
+// Float64 one every other writer of $latitude/$longitude uses.
+const makeDoubleValue = (value: number): PropertyValue =>
+  create(PropertyValueSchema, { value: { case: 'doubleValue', value } })
+
+/**
+ * Renders TrackOptions.location as geo auto-properties. The server skips geo enrichment on
+ * private-key requests, which is all this SDK makes, so these keys are the only geo the event
+ * will ever carry — a dropped field is a permanent hole, not one filled in later.
+ */
+const locationProps = (location: EventLocation | undefined, kind: string): Record<string, PropertyValue> => {
+  const props: Record<string, PropertyValue> = {}
+  if (location === undefined || location === null) {
+    return props
+  }
+  if (typeof location !== 'object' || Array.isArray(location)) {
+    const got = Array.isArray(location) ? 'array' : typeof location
+    log.warn(`Ignoring location on event "${kind}": expected an object, got ${got}`)
+    return props
+  }
+
+  for (const key of Object.keys(location)) {
+    if (!Object.hasOwn(LOCATION_FIELDS, key)) {
+      log.warn(`Ignoring unknown location field "${key}" on event "${kind}"; expected one of ${LOCATION_FIELD_NAMES}`)
+    }
+  }
+
+  const coords: { latitude?: number; longitude?: number } = {}
+  for (const [field, expected] of Object.entries(LOCATION_FIELDS) as [keyof EventLocation, 'string' | 'number'][]) {
+    const value = location[field]
+    if (value === undefined || value === null) {
+      continue
+    }
+    if (typeof value !== expected) {
+      log.warn(`Ignoring location.${field} on event "${kind}": expected a ${expected}, got ${typeof value}`)
+      continue
+    }
+    if (typeof value === 'number') {
+      const limit = field === 'latitude' ? 90 : 180
+      if (!Number.isFinite(value) || Math.abs(value) > limit) {
+        log.warn(`Ignoring location.${field} ${value} on event "${kind}"; expected a number within ±${limit}`)
+        continue
+      }
+      coords[field as 'latitude' | 'longitude'] = value
+      continue
+    }
+    const trimmed = value.trim()
+    if (trimmed === '') {
+      continue
+    }
+    if (field === 'country') {
+      const code = trimmed.toUpperCase()
+      if (!COUNTRY_CODES.has(code)) {
+        log.warn(
+          `Ignoring location.country "${value}" on event "${kind}"; expected an ISO 3166-1 alpha-2 code like "DE"`,
+        )
+        continue
+      }
+      props.$country = makeStringValue(code)
+      continue
+    }
+    props[`$${field}`] = makeStringValue(trimmed)
+  }
+
+  // A lone coordinate reads as a real position with the other axis at 0, so send both or neither.
+  if (coords.latitude !== undefined && coords.longitude !== undefined) {
+    props.$latitude = makeDoubleValue(coords.latitude)
+    props.$longitude = makeDoubleValue(coords.longitude)
+  } else if (coords.latitude !== undefined || coords.longitude !== undefined) {
+    log.warn(`Ignoring location coordinates on event "${kind}": latitude and longitude must be set together`)
+  }
+
+  if (Object.keys(props).length === 0) {
+    log.warn(`Ignoring location on event "${kind}": no usable fields; the event will carry no geo`)
+  }
+  return props
 }
 
 /**
@@ -281,6 +395,7 @@ export const toEvent = (
         $lib: makeStringValue('pug-node'),
         $sdkVersion: makeStringValue(SDK_VERSION),
         $platform: makeStringValue('server'),
+        ...locationProps(opts?.location, kind),
       },
       customProperties,
       kind,
