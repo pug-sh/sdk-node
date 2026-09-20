@@ -92,9 +92,29 @@ new Pug({
 - `pug.flush()` — send the currently-buffered events now.
 - `pug.close()` — drain and shut down; call on graceful exit so nothing buffered is lost.
 
-`track` options: `timestamp` (epoch ms override), `sessionId` (per-call session override).
+`track` options: `timestamp` (epoch ms override), `sessionId` (per-call session override),
+`location` (the visitor's location — see below).
 `identify` options: `anonymousId` (must start with `anon-`; triggers anon→identified merge),
 `deviceId`.
+
+Pug only derives geo from CDN headers on browser (public-key) requests. This SDK uses a
+private key, so the server adds no geo of its own — without `location`, an event has no geo
+at all:
+
+```ts
+pug.track('user-123', 'checkout_completed', { plan: 'pro' }, {
+  location: { country: 'DE', city: 'Berlin' },
+});
+```
+
+Fields: `continent`, `country`, `region`, `city`, `postalCode`, `metroCode`, `timezone`,
+`latitude`, `longitude` — strings, except the two coordinates. `country` must be an ISO
+3166-1 alpha-2 code (case and surrounding spaces are normalized); `latitude` and `longitude`
+are only sent as a pair.
+
+A field that is missing, null or empty is omitted silently. One that looks like a mistake —
+unknown key, wrong type, unknown country, coordinate out of range — is dropped with a
+warning and the rest is still sent. If nothing is usable the event goes out with no geo.
 
 ### Reads (throw `PugError`)
 

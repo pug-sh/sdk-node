@@ -1,6 +1,6 @@
 import { uuidv7 } from 'uuidv7'
 import { describe, expect, it, vi } from 'vitest'
-import { toEvent } from './track.js'
+import { type EventLocation, toEvent } from './track.js'
 import { wellKnownSchemas } from './well-known-events.js'
 
 const SESSION = uuidv7()
@@ -101,5 +101,145 @@ describe('toEvent occurTime', () => {
     expect(e?.occurTime?.seconds).toBeGreaterThanOrEqual(nowSeconds)
     expect(e?.occurTime?.seconds).toBeLessThan(nowSeconds + 60n)
     warn.mockRestore()
+  })
+})
+
+describe('toEvent location', () => {
+  const location = (loc: unknown) =>
+    toEvent('my.custom', SESSION, 'user_1', undefined, { location: loc as EventLocation })
+  const BASE_KEYS = ['$lib', '$platform', '$sdkVersion']
+
+  it('renders every location field as a geo auto-property', () => {
+    const ap = location({
+      continent: 'EU',
+      country: 'DE',
+      region: 'Berlin',
+      city: ' Berlin ',
+      postalCode: '10115',
+      metroCode: '807',
+      timezone: 'Europe/Berlin',
+      latitude: 52.52,
+      longitude: 13.405,
+    })?.autoProperties
+    expect(ap?.$continent.value.value).toBe('EU')
+    expect(ap?.$country.value.value).toBe('DE')
+    expect(ap?.$region.value.value).toBe('Berlin')
+    expect(ap?.$city.value.value).toBe('Berlin')
+    expect(ap?.$postalCode.value.value).toBe('10115')
+    expect(ap?.$metroCode.value.value).toBe('807')
+    expect(ap?.$timezone.value.value).toBe('Europe/Berlin')
+    expect(ap?.$latitude.value.value).toBe(52.52)
+    expect(ap?.$longitude.value.value).toBe(13.405)
+  })
+
+  // A whole-number coordinate must not land in the int slot: every other writer of these
+  // keys uses Float64, and the two are different ClickHouse Variant slots.
+  it('always renders coordinates as doubleValue', () => {
+    const e = location({ latitude: 52, longitude: 13 })
+    expect(e?.autoProperties.$latitude.value.case).toBe('doubleValue')
+    expect(e?.autoProperties.$longitude.value.case).toBe('doubleValue')
+  })
+
+  it('accepts coordinates at the poles and the antimeridian', () => {
+    const e = location({ latitude: -90, longitude: 180 })
+    expect(e?.autoProperties.$latitude.value.value).toBe(-90)
+    expect(e?.autoProperties.$longitude.value.value).toBe(180)
+  })
+
+  it('bounds latitude at 90 and longitude at 180', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(location({ latitude: 100, longitude: 13 })?.autoProperties.$latitude).toBeUndefined()
+    expect(location({ latitude: 45, longitude: 100 })?.autoProperties.$longitude.value.value).toBe(100)
+    warn.mockRestore()
+  })
+
+  // A lone coordinate reads as a real position with the other axis at 0.
+  it('drops a coordinate that has lost its pair', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const e = location({ latitude: 52.52, city: 'Berlin' })
+    expect(e?.autoProperties.$latitude).toBeUndefined()
+    expect(e?.autoProperties.$city.value.value).toBe('Berlin')
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('must be set together'))
+    warn.mockRestore()
+  })
+
+  it('normalizes country case and spacing', () => {
+    expect(location({ country: ' de ' })?.autoProperties.$country.value.value).toBe('DE')
+  })
+
+  it('drops a country outside the ISO set with a warning, keeping the rest', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const e = location({ country: 'XX', city: 'Berlin' })
+    expect(e?.autoProperties.$country).toBeUndefined()
+    expect(e?.autoProperties.$city.value.value).toBe('Berlin')
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('ISO 3166-1'))
+    warn.mockRestore()
+  })
+
+  // The slot follows the declared field, not the runtime value: a JS caller (or a parsed
+  // request body) that sends a number for a string field would otherwise file it in the
+  // wrong Variant slot, and skip the country check entirely.
+  it('drops a wrong-typed field with a warning, keeping the event', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const e = location({ country: 49, latitude: '52', city: 'Berlin' })
+    expect(e?.autoProperties.$country).toBeUndefined()
+    expect(e?.autoProperties.$latitude).toBeUndefined()
+    expect(e?.autoProperties.$city.value.value).toBe('Berlin')
+    expect(warn).toHaveBeenCalledTimes(2)
+    warn.mockRestore()
+  })
+
+  // TypeScript only catches this on a fresh literal, and this option exists to carry values
+  // out of a parsed request body.
+  it('warns about a key that is not a location field', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const e = location({ country: 'DE', citty: 'Berlin' })
+    expect(e?.autoProperties.$country.value.value).toBe('DE')
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('unknown location field "citty"'))
+    warn.mockRestore()
+  })
+
+  it('warns when location is not an object', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const e = location('Berlin')
+    expect(Object.keys(e?.autoProperties ?? {}).sort()).toEqual(BASE_KEYS)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('expected an object'))
+    warn.mockRestore()
+  })
+
+  // A null field is "unknown", not a mistake: it must cost the field, never the event.
+  it('treats a null field as absent', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const e = location({ country: 'DE', city: null })
+    expect(e?.autoProperties.$country.value.value).toBe('DE')
+    expect(e?.autoProperties.$city).toBeUndefined()
+    expect(warn).not.toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it('omits empty, out-of-range and non-finite values', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const e = location({ city: '  ', latitude: Number.NaN, longitude: 200, country: 'DE' })
+    expect(e?.autoProperties.$city).toBeUndefined()
+    expect(e?.autoProperties.$latitude).toBeUndefined()
+    expect(e?.autoProperties.$longitude).toBeUndefined()
+    expect(e?.autoProperties.$country.value.value).toBe('DE')
+    expect(warn).toHaveBeenCalledTimes(2)
+    warn.mockRestore()
+  })
+
+  // Silence here would look identical to sending no location at all, while the event ships
+  // with no geo whatsoever — nothing on the server fills it in.
+  it('warns when no field is usable', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const e = location({ city: '', country: '' })
+    expect(Object.keys(e?.autoProperties ?? {}).sort()).toEqual(BASE_KEYS)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('no usable fields'))
+    warn.mockRestore()
+  })
+
+  it('writes no geo keys when no location is given', () => {
+    const e = toEvent('my.custom', SESSION, 'user_1')
+    expect(Object.keys(e?.autoProperties ?? {}).sort()).toEqual(BASE_KEYS)
   })
 })
