@@ -1,0 +1,16 @@
+version: 2
+updates:
+  - package-ecosystem: "bun"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    # Every src/gen file is stamped with the protoc-gen-es version, so these PRs fail
+    # check-codegen until `make protos` is committed onto them. Grouping means doing that once.
+    groups:
+      bufbuild:
+        patterns: ["@bufbuild/*"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
