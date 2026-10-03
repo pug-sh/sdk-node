@@ -56,7 +56,7 @@
   "author": "pug.sh",
   "license": "MIT",
   "devDependencies": {
-    "@biomejs/biome": "2.4.14",
+    "@biomejs/biome": "2.5.14",
     "@bufbuild/protoc-gen-es": "^2.12.1",
     "@types/node": "^20.0.0",
     "typescript": "^5.9.3",
