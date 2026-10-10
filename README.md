@@ -31,7 +31,7 @@ const pug = new Pug({
 pug.track("user_42", "order.completed", { amount: 49.0, currency: "USD" });
 
 // Well-known events get typed properties (autocomplete + validation).
-pug.track("user_42", "feature_used", { feature_name: "export" });
+pug.track("user_42", "feature_used", { featureId: "export" });
 
 // Identify a profile (never throws — failures are logged).
 await pug.identify("user_42", { email: "ada@example.com", plan: "pro" });

@@ -8,7 +8,7 @@ import { log } from './logger.js'
 import { createRpcClients, type RpcClients } from './rpc.js'
 import { formatValidationError, type JsonValue, type TrackFn, type TrackOptions, toEvent } from './track.js'
 import { createEventSink } from './transport.js'
-import { DEFAULT_ENDPOINT } from './utils.js'
+import { DEFAULT_ENDPOINT, isPlainObject } from './utils.js'
 
 export interface Options {
   /** Project API key. Server SDKs use a private key (`prv_…`). */
@@ -87,6 +87,10 @@ export class Pug {
       }
       if (!externalId || typeof externalId !== 'string') {
         log.error('identify() requires a non-empty externalId string.')
+        return
+      }
+      if (traits != null && !isPlainObject(traits)) {
+        log.error('identify() traits must be a plain object.')
         return
       }
 
