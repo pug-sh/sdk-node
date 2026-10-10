@@ -188,10 +188,19 @@ const checkMessageInits = (schema: DescMessage, data: Record<string, unknown>): 
   }
 }
 
+const LONG_SCALARS = new Set([
+  ScalarType.INT64,
+  ScalarType.UINT64,
+  ScalarType.SINT64,
+  ScalarType.FIXED64,
+  ScalarType.SFIXED64,
+])
+
 // Neither create() nor protovalidate type-checks values. A checked reflect set does, and turns an
-// int64 number into a bigint. Strings skip it: its UTF-8 check would reject a lone surrogate the wire
-// sends as U+FFFD, and its int64 parse accepts " " and "0x10". isSet() counts an implicit-presence
-// zero, like a Duration's `seconds: 0`, as unset, which would leave it a number.
+// int64 number into a bigint, so a number past 2^53 is refused first: it may already be rounded.
+// Strings skip the set: its UTF-8 check would reject a lone surrogate the wire sends as U+FFFD, and
+// its int64 parse accepts " " and "0x10". isSet() counts an implicit-presence zero, like a
+// Duration's `seconds: 0`, as unset, which would leave it a number.
 const checkTypes = (r: ReflectMessage): void => {
   for (const field of r.fields) {
     if (!r.isSet(field) && field.presence !== FeatureSet_FieldPresence.IMPLICIT) {
@@ -205,6 +214,9 @@ const checkTypes = (r: ReflectMessage): void => {
       }
     } else if (field.fieldKind === 'scalar') {
       const value = r.get(field)
+      if (typeof value === 'number' && LONG_SCALARS.has(field.scalar) && !Number.isSafeInteger(value)) {
+        throw new FieldError(field, `expected a safe integer, got ${value}`)
+      }
       if (typeof value !== 'string') {
         r.set(field, value)
       } else if (field.scalar !== ScalarType.STRING) {

@@ -106,6 +106,13 @@ describe('well-known events', () => {
     err.mockRestore()
   })
 
+  it('drops an int64 number past 2^53 instead of sending it rounded', () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect(toEvent('file_uploaded', SESSION, 'user_1', { fileId: 'f1', sizeBytes: 2 ** 53 })).toBeNull()
+    expect(err).toHaveBeenCalledWith(expect.any(String), `sizeBytes: expected a safe integer, got ${2 ** 53}`)
+    err.mockRestore()
+  })
+
   it('keeps a string with a lone surrogate', () => {
     const e = toEvent('purchase', SESSION, 'user_1', { ...PURCHASE, productId: 'gift 🎁'.slice(0, 6) })
     expect(e?.customProperties.productId?.value.case).toBe('stringValue')
