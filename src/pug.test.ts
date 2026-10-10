@@ -55,13 +55,21 @@ describe('Pug', () => {
   })
 
   // protovalidate doesn't look inside traits, and a non-object would be sent as an empty Struct.
-  it('identify() drops traits that are not an object', async () => {
+  it.each([['{"plan":"pro"}'], [['pro']], [new Date(0)]])('identify() drops traits %j', async traits => {
     const err = vi.spyOn(console, 'error').mockImplementation(() => {})
     const pug = newClient()
     // @ts-expect-error testing runtime guard
-    await expect(pug.identify('user_1', '{"plan":"pro"}')).resolves.toBeUndefined()
+    await expect(pug.identify('user_1', traits)).resolves.toBeUndefined()
     expect(err).toHaveBeenCalledWith(expect.stringContaining('traits must be a plain object'))
     err.mockRestore()
+  })
+
+  it('identify() sends object traits', async () => {
+    const pug = newClient()
+    const identify = vi.fn()
+    ;(pug as unknown as { rpc: unknown }).rpc = { profilesSdk: { identify } }
+    await pug.identify('user_1', { plan: 'pro' })
+    expect(identify).toHaveBeenCalledWith(expect.objectContaining({ externalId: 'user_1', traits: { plan: 'pro' } }))
   })
 
   it('warns and drops identify() after close()', async () => {
