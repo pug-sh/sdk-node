@@ -73,10 +73,52 @@ describe('well-known events', () => {
     expect(e?.customProperties.productId).toBeUndefined()
   })
 
-  it('drops the event (returns null) when a known field violates its proto type', () => {
-    // `quantity` is int32; a non-integer fails proto construction/validation → drop.
-    const e = toEvent('purchase', SESSION, 'user_1', { quantity: 1.5 })
-    expect(e).toBeNull()
+  // Every other field is valid, and protovalidate doesn't type-check, so only the type can drop it.
+  const PURCHASE = { productId: 'p1', amount: 9.99, currency: 'USD', quantity: 2 }
+
+  it.each([
+    ['quantity', 1.5],
+    ['quantity', 2 ** 31],
+    ['quantity', '2'],
+    ['amount', '9.99'],
+    ['productId', 123],
+  ])('drops the event when %s is %j, naming the field', (field, value) => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect(toEvent('purchase', SESSION, 'user_1', { ...PURCHASE, [field]: value })).toBeNull()
+    expect(err).toHaveBeenCalledWith(expect.stringContaining(`PurchaseProperties": ${field}: `))
+    err.mockRestore()
+  })
+
+  // JSON has no bigint, so an int64 arrives as a number.
+  it('sends a number in an int64 field as an int', () => {
+    const e = toEvent('file_uploaded', SESSION, 'user_1', { fileId: 'f1', sizeBytes: 1024 })
+    expect(e?.customProperties.sizeBytes?.value).toEqual({ case: 'intValue', value: 1024n })
+  })
+
+  // BigInt() would read " " as 0 and "0x10" as 16.
+  it('drops a string in an int64 field instead of parsing it', () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect(toEvent('file_uploaded', SESSION, 'user_1', { fileId: 'f1', sizeBytes: ' ' })).toBeNull()
+    expect(err).toHaveBeenCalledWith(expect.stringContaining('sizeBytes: expected int64, got string'))
+    err.mockRestore()
+  })
+
+  // The wire sends it as U+FFFD, as it does for any other property.
+  it('keeps a string with a lone surrogate', () => {
+    const e = toEvent('purchase', SESSION, 'user_1', { ...PURCHASE, productId: 'gift 🎁'.slice(0, 6) })
+    expect(e?.customProperties.productId?.value.case).toBe('stringValue')
+  })
+
+  it('sends a Duration in its "1.5s" wire form', () => {
+    const e = toEvent('video_play', SESSION, 'user_1', { videoId: 'v1', position: { seconds: 90, nanos: 500_000_000 } })
+    expect(e?.customProperties.position?.value).toEqual({ case: 'stringValue', value: '90.5s' })
+  })
+
+  it('does not warn about an unset Duration', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(toEvent('video_play', SESSION, 'user_1', { videoId: 'v1' })).not.toBeNull()
+    expect(warn).not.toHaveBeenCalled()
+    warn.mockRestore()
   })
 })
 

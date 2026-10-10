@@ -1,6 +1,13 @@
-import { create, type DescMessage, type MessageInitShape, type MessageShape, ScalarType } from '@bufbuild/protobuf'
-import { reflect, type ScalarValue } from '@bufbuild/protobuf/reflect'
-import { timestampFromMs, timestampNow } from '@bufbuild/protobuf/wkt'
+import {
+  create,
+  type DescMessage,
+  isMessage,
+  type MessageInitShape,
+  type MessageShape,
+  ScalarType,
+} from '@bufbuild/protobuf'
+import { FieldError, isFieldError, type ReflectMessage, reflect, type ScalarValue } from '@bufbuild/protobuf/reflect'
+import { type Duration, DurationSchema, timestampFromMs, timestampNow } from '@bufbuild/protobuf/wkt'
 import { createValidator } from '@bufbuild/protovalidate'
 import { uuidv7 } from 'uuidv7'
 import { type PropertyValue, PropertyValueSchema } from './gen/common/v1/property_value_pb.js'
@@ -31,7 +38,7 @@ const isWellKnownEvent = (kind: string): kind is WellKnownEventName => Object.ha
 /** Renders a protovalidate failure result as a single human-readable string for logging. */
 export const formatValidationError = (result: ReturnType<typeof validator.validate>): string =>
   result.kind === 'invalid'
-    ? result.violations.map(v => `${v.field}: ${v.message}`).join(', ')
+    ? result.violations.map(v => v.toString()).join(', ')
     : result.kind === 'error'
       ? String(result.error)
       : ''
@@ -119,7 +126,7 @@ const jsValueToPropertyValue = (v: unknown): PropertyValue | null => {
 /**
  * Builds a PropertyValue for a known scalar field, picking the oneof case from the field's
  * proto scalar type rather than the JS value (preserves int-vs-double). Returns null for
- * BYTES / unenumerated scalars / type mismatch.
+ * BYTES, which has no PropertyValue case.
  */
 const scalarToPropertyValue = (v: ScalarValue, scalar: ScalarType): PropertyValue | null => {
   switch (scalar) {
@@ -149,6 +156,31 @@ const scalarToPropertyValue = (v: ScalarValue, scalar: ScalarType): PropertyValu
   }
 }
 
+// options.proto's wire contract for a Duration: seconds, an optional fraction, then "s" ("1.5s").
+const formatDuration = ({ seconds, nanos }: Duration): string =>
+  `${seconds}${nanos ? `.${String(nanos).padStart(9, '0').replace(/0+$/, '')}` : ''}s`
+
+// Neither create() nor protovalidate type-checks values. A checked reflect set does, and turns an
+// int64 number into a bigint. Strings skip it: its UTF-8 check would drop a lone surrogate the wire
+// sends as U+FFFD, and its int64 parse accepts " " and "0x10".
+const checkTypes = (r: ReflectMessage): void => {
+  for (const field of r.fields) {
+    if (!r.isSet(field)) {
+      continue
+    }
+    if (field.fieldKind === 'message') {
+      checkTypes(r.get(field))
+    } else if (field.fieldKind === 'scalar') {
+      const value = r.get(field)
+      if (typeof value !== 'string') {
+        r.set(field, value)
+      } else if (field.scalar !== ScalarType.STRING) {
+        throw new FieldError(field, `expected ${ScalarType[field.scalar].toLowerCase()}, got string`)
+      }
+    }
+  }
+}
+
 type WellKnownValidation<Desc extends DescMessage> =
   | { ok: true; msg: MessageShape<Desc>; extras: Record<string, JsonValue> }
   | { ok: false }
@@ -175,8 +207,10 @@ const validateWellKnownProps = <Desc extends DescMessage>(
   let msg: MessageShape<Desc>
   try {
     msg = create(schema, knownData as MessageInitShape<Desc>)
+    checkTypes(reflect(schema, msg))
   } catch (err) {
-    log.error(`Event "${kind}" dropped: invalid properties for "${schema.typeName}":`, err)
+    const reason = isFieldError(err) ? `${err.field().localName}: ${err.message}` : String(err)
+    log.error(`Event "${kind}" dropped: invalid properties for "${schema.typeName}": ${reason}`)
     return { ok: false }
   }
 
@@ -192,7 +226,7 @@ const validateWellKnownProps = <Desc extends DescMessage>(
   return { ok: true, msg, extras }
 }
 
-/** Walks a typed well-known message and builds customProperties from its set scalar fields. */
+/** Walks a typed well-known message and builds customProperties from its set fields. */
 const buildKnownPropertyMap = <Desc extends DescMessage>(
   schema: Desc,
   msg: MessageShape<Desc>,
@@ -200,11 +234,18 @@ const buildKnownPropertyMap = <Desc extends DescMessage>(
   const out: Record<string, PropertyValue> = {}
   const r = reflect(schema, msg, false)
   for (const field of schema.fields) {
-    if (field.fieldKind !== 'scalar') {
-      log.warn(`Field "${schema.typeName}.${field.localName}" has unsupported fieldKind "${field.fieldKind}", skipping`)
+    if (!r.isSet(field)) {
       continue
     }
-    if (!r.isSet(field)) {
+    if (field.fieldKind === 'message') {
+      const value = r.get(field).message
+      if (isMessage(value, DurationSchema)) {
+        out[field.localName] = makeStringValue(formatDuration(value))
+        continue
+      }
+    }
+    if (field.fieldKind !== 'scalar') {
+      log.warn(`Field "${schema.typeName}.${field.localName}" has unsupported fieldKind "${field.fieldKind}", skipping`)
       continue
     }
     const pv = scalarToPropertyValue(r.get(field), field.scalar)
