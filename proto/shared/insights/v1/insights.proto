@@ -12,14 +12,39 @@ import "google/protobuf/timestamp.proto";
 option go_package = "github.com/pug-sh/pug/internal/gen/proto/shared/insights/v1;insightsv1";
 
 service InsightsService {
+  // Query runs a product-analytics insight over the project's events and returns
+  // the computed result. A single call covers every insight type — trends,
+  // segmentation, funnel, retention, user flow (Sankey), top-K and map (a metric
+  // per country, returned as top_k rows keyed by ISO alpha-2) — chosen by the
+  // InsightQuerySpec (its insight_type, events, breakdowns and filters, among
+  // others). Map, user flow, top-K and session each carry their own sub-message
+  // (spec.map / spec.user_flow / spec.top_k / spec.session) and take no events or
+  // breakdowns; a map's country dimension is implicit, so spec.map may be empty.
+  // The request also carries the time range and granularity, and it is the
+  // right tool for any project-wide or over-time question; per-granularity range
+  // caps apply. Traffic tagged as a bot at ingest is excluded unless
+  // spec.include_bots is true.
+  // Discover valid event kinds and property keys with the get_insights_filter_schema tool first.
   rpc Query(QueryRequest) returns (QueryResponse);
+  // SegmentUsers returns a paginated page of the distinct ids of the users who
+  // performed a given set of events (with optional filters) in a time range — the
+  // "who" behind a number on a chart. Not exposed as an MCP tool while the
+  // drill-down insight is still WIP; see toolPolicy in
+  // internal/app/server/mcp/rename.go.
   rpc SegmentUsers(SegmentUsersRequest) returns (SegmentUsersResponse);
+  // GetFilterSchema lists the event kinds and the property keys/types available to
+  // filter and break down by. Call it before query_insights so that filters and
+  // breakdowns reference keys that actually exist in this project.
+  //
   // The filter-schema concept is service-agnostic; both shared.insights and
   // shared.activity expose the same shape via common.v1.
   // buf:lint:ignore RPC_REQUEST_STANDARD_NAME
   // buf:lint:ignore RPC_RESPONSE_STANDARD_NAME
   // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
   rpc GetFilterSchema(common.v1.GetFilterSchemaRequest) returns (common.v1.GetFilterSchemaResponse);
+  // GetPropertyValues lists the observed values of an event or user property
+  // (e.g. the countries seen for "$country") so filters and breakdowns can be
+  // populated with real values before running query_insights.
   rpc GetPropertyValues(GetPropertyValuesRequest) returns (GetPropertyValuesResponse);
 }
 
@@ -191,6 +216,26 @@ message InsightQuerySpec {
   // Top-K ranking query. Only valid when insight_type == TOP_K.
   TopKQuery top_k = 11;
 
+  // Cookieless (no-consent) visitors carry server-derived ids that rotate
+  // daily, so one returning human counts as a new user every day. By default
+  // they are EXCLUDED from user-counting metrics (UNIQUE_USERS and
+  // PER_USER_AVG, numerator and denominator alike, wherever those metrics
+  // appear — trends, segmentation, top K) and from person-based insights
+  // (funnel, retention, user flow, and USER-dimension top K — these resolve
+  // people rather than events, so they exclude regardless of which metric is
+  // selected). Set true to include them. Event totals, numeric aggregations,
+  // and all session metrics always count all traffic regardless of this flag.
+  bool include_cookieless = 12;
+
+  // Country-choropleth query. Only valid when insight_type == MAP.
+  MapQuery map = 13;
+
+  // Traffic tagged as automated at ingest ($bot: crawler user agents and
+  // datacenter networks) is EXCLUDED by default from every insight and every
+  // metric. Session metrics and user flow judge a session whole: one tagged
+  // event excludes the session. Set true to include bots.
+  bool include_bots = 14;
+
   option (buf.validate.message).cel = {
     id: "insight_query_spec.user_flow_only_for_user_flow"
     message: "user_flow is only valid for user flow insight type"
@@ -355,6 +400,77 @@ message InsightQuerySpec {
       "  shared.insights.v1.AggregationType.AGGREGATION_TYPE_PER_USER_AVG"
       "])"
   };
+
+  option (buf.validate.message).cel = {
+    id: "insight_query_spec.map_only_for_map"
+    message: "map is only valid for map insight type"
+    expression:
+      "!has(this.map)"
+      "|| this.insight_type == shared.insights.v1.InsightType.INSIGHT_TYPE_MAP"
+  };
+  option (buf.validate.message).cel = {
+    id: "insight_query_spec.map_required"
+    message: "map insight type requires map"
+    expression:
+      "this.insight_type != shared.insights.v1.InsightType.INSIGHT_TYPE_MAP"
+      "|| has(this.map)"
+  };
+  option (buf.validate.message).cel = {
+    id: "insight_query_spec.map_no_events"
+    message: "map insights cannot specify events"
+    expression:
+      "this.insight_type != shared.insights.v1.InsightType.INSIGHT_TYPE_MAP"
+      "|| this.events.size() == 0"
+  };
+  option (buf.validate.message).cel = {
+    id: "insight_query_spec.map_no_session"
+    message: "map insights cannot specify session"
+    expression:
+      "this.insight_type != shared.insights.v1.InsightType.INSIGHT_TYPE_MAP"
+      "|| !has(this.session)"
+  };
+  // The country dimension is implied by the insight type, so there is nothing to
+  // break down by — and no top-N to bound. Every country with traffic is returned.
+  option (buf.validate.message).cel = {
+    id: "insight_query_spec.map_no_breakdowns"
+    message: "breakdowns are not supported for map insight type"
+    expression:
+      "this.insight_type != shared.insights.v1.InsightType.INSIGHT_TYPE_MAP"
+      "|| this.breakdowns.size() == 0"
+  };
+  option (buf.validate.message).cel = {
+    id: "insight_query_spec.map_no_breakdown_limit"
+    message: "breakdown_limit is not supported for map insight type"
+    expression:
+      "this.insight_type != shared.insights.v1.InsightType.INSIGHT_TYPE_MAP"
+      "|| this.breakdown_limit == 0"
+  };
+  option (buf.validate.message).cel = {
+    id: "insight_query_spec.map_metric_property_required"
+    message: "metric_property is required for SUM, AVG, MIN, and MAX metrics"
+    expression:
+      "this.insight_type != shared.insights.v1.InsightType.INSIGHT_TYPE_MAP"
+      "|| !(this.map.metric in ["
+      "  shared.insights.v1.AggregationType.AGGREGATION_TYPE_SUM,"
+      "  shared.insights.v1.AggregationType.AGGREGATION_TYPE_AVG,"
+      "  shared.insights.v1.AggregationType.AGGREGATION_TYPE_MIN,"
+      "  shared.insights.v1.AggregationType.AGGREGATION_TYPE_MAX"
+      "]) || this.map.metric_property != ''"
+  };
+  // metric_property with a counting metric is silently ignored — likely a client mistake.
+  option (buf.validate.message).cel = {
+    id: "insight_query_spec.map_metric_property_only_for_numeric"
+    message: "metric_property is only valid for SUM, AVG, MIN, and MAX metrics"
+    expression:
+      "this.insight_type != shared.insights.v1.InsightType.INSIGHT_TYPE_MAP"
+      "|| this.map.metric_property == ''"
+      "|| this.map.metric in ["
+      "  shared.insights.v1.AggregationType.AGGREGATION_TYPE_SUM,"
+      "  shared.insights.v1.AggregationType.AGGREGATION_TYPE_AVG,"
+      "  shared.insights.v1.AggregationType.AGGREGATION_TYPE_MIN,"
+      "  shared.insights.v1.AggregationType.AGGREGATION_TYPE_MAX"
+      "]"
+  };
 }
 
 message QueryRequest {
@@ -464,6 +580,7 @@ enum InsightType {
   INSIGHT_TYPE_RETENTION = 4;
   INSIGHT_TYPE_USER_FLOW = 5;
   INSIGHT_TYPE_TOP_K = 6;
+  INSIGHT_TYPE_MAP = 7;
 }
 
 // Granularity values are listed finest → coarsest by source-order convention.
@@ -504,6 +621,12 @@ enum SessionMetric {
   // Count sessions by their last matching event's breakdown value (exit page).
   // Requires TRENDS with exactly one breakdown.
   SESSION_METRIC_EXIT = 5;
+  // Average number of scoped events per session. With a page_view scope this
+  // is pages per session. A first-class metric (not a client-side division of
+  // a pageview tile by a session tile) because pageviews are windowed on
+  // occurrence day while sessions are keyed on session start and never
+  // clipped — dividing two tiles disagrees visibly on boundary days.
+  SESSION_METRIC_AVG_EVENTS_PER_SESSION = 6;
 }
 
 message SessionQuery {
@@ -544,14 +667,17 @@ message UserFlowQuery {
   // Not a session filter — sessions with no eligible events emit no transitions.
   common.v1.EventFilter scope = 4;
 
-  // Maximum transitions (edges) per session/user. A max_hops = N flow touches at most N+1 nodes.
+  // Maximum transitions (edges) per session/user, i.e. the number of Sankey
+  // steps. A max_hops = N flow touches at most N+1 nodes (depths 0..N).
   // Default 5 in builder. CEL max: 10.
   int32 max_hops = 5;
 
-  // Top-N nodes before $others collapse. Default 20. CEL min 2, max 50 when set.
+  // Top-N nodes to keep PER STEP (per depth) before collapsing the rest of that
+  // step into its $others bucket. Default 20. CEL min 2, max 50 when set.
   int32 max_nodes = 6;
 
-  // Maximum links in response after $others collapse. Default 100. CEL max 500 when set.
+  // Maximum links in response after the per-step $others collapse (lowest-value
+  // links dropped). Default 250. CEL max 500 when set.
   int32 max_links = 7;
 }
 
@@ -637,6 +763,27 @@ message TopKRow {
   TopKProfile profile = 4;
 }
 
+// MapQuery measures a metric per country for a choropleth. The dimension is
+// fixed to the $country auto-property, which is what makes this an insight type
+// rather than a chart style.
+//
+// Results arrive as QueryResponse.top_k, with no $others bucket. Every key is an
+// assigned ISO 3166-1 alpha-2 code; rows the server cannot confirm as one are
+// dropped — unresolved traffic, and any value a client wrote to $country
+// directly — so the rows do not sum to the project's total.
+message MapQuery {
+  // Optional event scope (kind and/or per-event filters), same reuse as
+  // TopKQuery.scope. Empty scope means all events participate.
+  common.v1.EventFilter scope = 1;
+
+  // Metric to measure per country. Defaults to TOTAL when unspecified.
+  AggregationType metric = 2 [(buf.validate.field).enum.defined_only = true];
+
+  // Property to aggregate. Required for SUM/AVG/MIN/MAX; ignored otherwise.
+  // Pattern uses * (not +) because this field may be empty for count-based metrics.
+  string metric_property = 3 [(buf.validate.field).string.pattern = "^\\$?[a-zA-Z0-9_.-]*$"];
+}
+
 // TopKProfile is the profile enrichment attached to a DIMENSION_USER row.
 message TopKProfile {
   string id = 1;
@@ -646,12 +793,25 @@ message TopKProfile {
 }
 
 message UserFlowNode {
+  // Opaque unique key, referenced by UserFlowLink.source/target. Unique per
+  // (depth, label): the same event kind or property value at two different steps
+  // is two distinct nodes (e.g. "page_view" at step 0 and step 2). Treat as an
+  // opaque token — do not parse it; use label for display and depth for column.
   string id = 1;
-  // is_others marks the synthetic overflow bucket that aggregates the nodes
-  // pruned by max_nodes. Real nodes have is_others=false. Clients must identify
-  // the bucket by this flag, NOT by matching id against "$others" — a real event
-  // kind or property value can legitimately be the literal string "$others".
+  // is_others marks the synthetic per-step overflow bucket that aggregates the
+  // nodes pruned by max_nodes at that depth. Real nodes have is_others=false.
+  // Clients must identify the bucket by this flag, NOT by matching id/label
+  // against "$others" — a real event kind or property value can legitimately be
+  // the literal string "$others".
   bool is_others = 2;
+  // depth is the 0-based step index — the Sankey column. It is the node's
+  // position in each session's time-ordered event sequence. Every link connects
+  // a node at depth d to a node at depth d+1, so the graph is a layered DAG.
+  int32 depth = 3;
+  // label is the display name: the event kind (NODE_KIND_EVENT_KIND) or property
+  // value (NODE_KIND_PROPERTY). The overflow bucket carries "$others" but must be
+  // rendered from is_others, not by matching this string.
+  string label = 4;
 }
 
 message UserFlowLink {
