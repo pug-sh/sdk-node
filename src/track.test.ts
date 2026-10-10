@@ -67,10 +67,11 @@ describe('well-known events', () => {
   })
 
   it('routes unknown props through the heuristic as extras', () => {
-    const e = toEvent('purchase', SESSION, 'user_1', { amount: 5, quantity: 1, currency: 'USD', referrer: 'news' })
+    const e = toEvent('purchase', SESSION, 'user_1', { amount: 5, currency: 'USD', referrer: 'news' })
     expect(e?.customProperties.referrer?.value.case).toBe('stringValue')
     // Unset known fields are not emitted.
     expect(e?.customProperties.productId).toBeUndefined()
+    expect(e?.customProperties.quantity).toBeUndefined()
   })
 
   // Every other field is valid, and protovalidate doesn't type-check, so only the type can drop it.
@@ -85,7 +86,10 @@ describe('well-known events', () => {
   ])('drops the event when %s is %j, naming the field', (field, value) => {
     const err = vi.spyOn(console, 'error').mockImplementation(() => {})
     expect(toEvent('purchase', SESSION, 'user_1', { ...PURCHASE, [field]: value })).toBeNull()
-    expect(err).toHaveBeenCalledWith(expect.stringContaining(`PurchaseProperties": ${field}: `))
+    expect(err).toHaveBeenCalledWith(
+      expect.stringContaining('invalid properties'),
+      expect.stringMatching(`^${field}: `),
+    )
     err.mockRestore()
   })
 
@@ -95,23 +99,44 @@ describe('well-known events', () => {
     expect(e?.customProperties.sizeBytes?.value).toEqual({ case: 'intValue', value: 1024n })
   })
 
-  // BigInt() would read " " as 0 and "0x10" as 16.
   it('drops a string in an int64 field instead of parsing it', () => {
     const err = vi.spyOn(console, 'error').mockImplementation(() => {})
     expect(toEvent('file_uploaded', SESSION, 'user_1', { fileId: 'f1', sizeBytes: ' ' })).toBeNull()
-    expect(err).toHaveBeenCalledWith(expect.stringContaining('sizeBytes: expected int64, got string'))
+    expect(err).toHaveBeenCalledWith(expect.any(String), 'sizeBytes: expected int64, got string')
     err.mockRestore()
   })
 
-  // The wire sends it as U+FFFD, as it does for any other property.
   it('keeps a string with a lone surrogate', () => {
     const e = toEvent('purchase', SESSION, 'user_1', { ...PURCHASE, productId: 'gift 🎁'.slice(0, 6) })
     expect(e?.customProperties.productId?.value.case).toBe('stringValue')
   })
 
-  it('sends a Duration in its "1.5s" wire form', () => {
-    const e = toEvent('video_play', SESSION, 'user_1', { videoId: 'v1', position: { seconds: 90, nanos: 500_000_000 } })
-    expect(e?.customProperties.position?.value).toEqual({ case: 'stringValue', value: '90.5s' })
+  it.each([
+    [{ seconds: 0 }, '0s'],
+    [{ seconds: 0, nanos: 500_000_000 }, '0.5s'],
+    [{ seconds: 1, nanos: 5_000_000 }, '1.005s'],
+    [{ seconds: 90 }, '90s'],
+    [{ seconds: 90, nanos: 500_000_000 }, '90.5s'],
+    [{ seconds: 1, nanos: -500_000_000 }, '0.5s'],
+    [{ seconds: 1, nanos: 1_000_000_000 }, '2s'],
+  ])('sends Duration %j as "%s"', (position, wire) => {
+    const e = toEvent('video_play', SESSION, 'user_1', { videoId: 'v1', position })
+    expect(e?.customProperties.position?.value).toEqual({ case: 'stringValue', value: wire })
+  })
+
+  it.each([[90], ['90s'], [{ ms: 90_000 }], [new Date(90_000)]])('drops the event when a Duration is %j', position => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect(toEvent('video_play', SESSION, 'user_1', { videoId: 'v1', position })).toBeNull()
+    expect(err).toHaveBeenCalledWith(expect.any(String), 'position: expected a Duration ({ seconds, nanos })')
+    err.mockRestore()
+  })
+
+  it('names the Duration field a nested error came from', () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const props = { videoId: 'v1', fromPosition: { seconds: 5 }, toPosition: { seconds: '9' } }
+    expect(toEvent('video_seeked', SESSION, 'user_1', props)).toBeNull()
+    expect(err).toHaveBeenCalledWith(expect.any(String), 'toPosition: seconds: expected int64, got string')
+    err.mockRestore()
   })
 
   it('does not warn about an unset Duration', () => {
