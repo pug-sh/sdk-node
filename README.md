@@ -121,8 +121,12 @@ warning and the rest is still sent. If nothing is usable the event goes out with
 These require a private key and run in your control flow:
 
 - `pug.profiles` — `get`, `getByExternalId`, `delete`, `list` (auto-paginating async iterator).
-- `pug.activity` — `feed`, `eventExplorer`, `heatmap`, `profileStats`, `filterSchema`, `propertyValues`.
+- `pug.activity` — `feed`, `eventExplorer`, `heatmap`, `profileSessions`, `profileStats`, `filterSchema`,
+  `propertyValues`.
 - `pug.insights` — `query`, `segmentUsers`, `filterSchema`, `propertyValues`.
+
+Reads leave out traffic tagged as a bot at ingest unless you set `includeBots: true` (for
+`profiles.get` and `getByExternalId`, pass it as a second argument).
 
 Errors normalize to `PugError`, which carries the underlying Connect `code` and `cause`.
 
