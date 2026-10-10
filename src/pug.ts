@@ -68,6 +68,11 @@ export class Pug {
         log.error('track() requires a non-empty distinctId string.')
         return
       }
+      // The server rejects a whole batch over one such id, taking other users' events with it.
+      if (distinctId.startsWith('cookieless-')) {
+        log.error("track() distinctId must not start with the reserved 'cookieless-' prefix.")
+        return
+      }
       const event = toEvent(kind, opts?.sessionId ?? this.sessionId, distinctId, props, opts)
       if (!event) {
         return // toEvent already logged the reason
@@ -134,9 +139,10 @@ export class Pug {
   // --- reads (private key; throw PugError) ---------------------------------
 
   readonly profiles = {
-    get: (id: string) => this.read(() => this.rpc.profiles.get({ id }).then(r => r.profile)),
-    getByExternalId: (externalId: string) =>
-      this.read(() => this.rpc.profiles.getByExternalId({ externalId }).then(r => r.profile)),
+    get: (id: string, opts?: { includeBots?: boolean }) =>
+      this.read(() => this.rpc.profiles.get({ id, ...opts }).then(r => r.profile)),
+    getByExternalId: (externalId: string, opts?: { includeBots?: boolean }) =>
+      this.read(() => this.rpc.profiles.getByExternalId({ externalId, ...opts }).then(r => r.profile)),
     delete: (id: string) => this.read(() => this.rpc.profiles.delete({ id }).then(() => undefined)),
     /** Auto-paginating async iterator over matching profiles. */
     list: (req: Parameters<RpcClients['profiles']['list']>[0] = {}) => this.listProfiles(req),
@@ -149,6 +155,8 @@ export class Pug {
       this.read(() => this.rpc.activity.getEventExplorer(req)),
     heatmap: (req: Parameters<RpcClients['activity']['getActivityHeatmap']>[0]) =>
       this.read(() => this.rpc.activity.getActivityHeatmap(req)),
+    profileSessions: (req: Parameters<RpcClients['activity']['getProfileSessions']>[0]) =>
+      this.read(() => this.rpc.activity.getProfileSessions(req)),
     profileStats: (req: Parameters<RpcClients['activity']['getProfileStats']>[0]) =>
       this.read(() => this.rpc.activity.getProfileStats(req)),
     filterSchema: () => this.read(() => this.rpc.activity.getFilterSchema({})),

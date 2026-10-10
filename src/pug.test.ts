@@ -112,4 +112,35 @@ describe('Pug', () => {
     expect(sent[0]?.autoProperties.$country.value.value).toBe('DE')
     expect(sent[0]?.occurTime).toMatchObject({ seconds: 0n })
   })
+
+  it("track() drops a distinctId with the reserved 'cookieless-' prefix", () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const pug = newClient()
+    const sent: unknown[] = []
+    ;(pug as unknown as { transport: unknown }).transport = { send: (e: never) => sent.push(e) }
+    pug.track('cookieless-abc', 'my.custom')
+    expect(sent).toHaveLength(0)
+    expect(err).toHaveBeenCalledWith(expect.stringContaining("reserved 'cookieless-' prefix"))
+    err.mockRestore()
+  })
+
+  it("identify() rejects an externalId with the reserved 'cookieless-' prefix", async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    await newClient().identify('cookieless-abc')
+    expect(err).toHaveBeenCalledWith(expect.stringContaining("reserved 'cookieless-' prefix"))
+    err.mockRestore()
+  })
+
+  it('passes reads through to the RPC', async () => {
+    const pug = newClient()
+    const getProfileSessions = vi.fn(async () => ({ sessions: [] }))
+    const get = vi.fn(async () => ({ profile: { id: 'p1' } }))
+    ;(pug as unknown as { rpc: unknown }).rpc = { activity: { getProfileSessions }, profiles: { get } }
+    await expect(pug.activity.profileSessions({ distinctId: 'p1', includeBots: true })).resolves.toEqual({
+      sessions: [],
+    })
+    await expect(pug.profiles.get('p1', { includeBots: true })).resolves.toEqual({ id: 'p1' })
+    expect(getProfileSessions).toHaveBeenCalledWith({ distinctId: 'p1', includeBots: true })
+    expect(get).toHaveBeenCalledWith({ id: 'p1', includeBots: true })
+  })
 })
