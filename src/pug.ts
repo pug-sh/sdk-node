@@ -89,6 +89,10 @@ export class Pug {
         log.error('identify() requires a non-empty externalId string.')
         return
       }
+      if (traits != null && (typeof traits !== 'object' || Array.isArray(traits))) {
+        log.error('identify() traits must be a plain object.')
+        return
+      }
 
       const req = create(IdentifyRequestSchema, {
         externalId,
