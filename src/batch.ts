@@ -8,7 +8,7 @@ export interface BatchConfig {
   readonly maxQueueSize: number
 }
 
-export const DEFAULT_BATCH_CONFIG: BatchConfig = {
+const DEFAULT_BATCH_CONFIG: BatchConfig = {
   maxSize: 100,
   maxWaitMs: 5000,
   maxQueueSize: 10_000,
