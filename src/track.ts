@@ -175,6 +175,14 @@ const validateWellKnownProps = <Desc extends DescMessage>(
   let msg: MessageShape<Desc>
   try {
     msg = create(schema, knownData as MessageInitShape<Desc>)
+    // create() doesn't type-check scalars, and since protovalidate 1.3 validate() doesn't either
+    // (1.5 for an int32 used to fail only incidentally, in CEL). A checked reflect set does.
+    const r = reflect(schema, msg)
+    for (const field of schema.fields) {
+      if (field.fieldKind === 'scalar' && r.isSet(field)) {
+        r.set(field, r.get(field))
+      }
+    }
   } catch (err) {
     log.error(`Event "${kind}" dropped: invalid properties for "${schema.typeName}":`, err)
     return { ok: false }
