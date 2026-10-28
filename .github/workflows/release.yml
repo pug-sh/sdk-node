@@ -1,0 +1,69 @@
+name: Release
+
+# Pushing a version tag (v0.0.8) checks the tagged commit as CI does and packs it, then publishes that
+# package to npm, which cannot be undone.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check and pack the tagged commit
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      # npm publishes the version in package.json, whatever the tag says.
+      - name: Check the tag matches package.json
+        run: |
+          version="$(jq -r .version package.json)"
+          test "$GITHUB_REF_NAME" = "v$version" \
+            || { echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version"; exit 1; }
+
+      - uses: oven-sh/setup-bun@v2
+
+      - uses: bufbuild/buf-setup-action@v1.50.0
+        with:
+          version: 1.73.0
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - run: bun install --frozen-lockfile
+
+      - run: make check-proto-pin ci
+
+      - name: Check for uncommitted changes
+        run: git diff --exit-code
+
+      - run: npm pack --pack-destination "$RUNNER_TEMP"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: package
+          path: ${{ runner.temp }}/*.tgz
+          if-no-files-found: error
+
+  # A job of its own that installs nothing, so no dependency's code runs beside npm's OIDC token.
+  publish:
+    name: Publish to npm
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      id-token: write # trusted publishing; provenance comes with it
+    steps:
+      # Trusted publishing needs npm >= 11.5.1, which Node 24 ships.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: package
+          path: ${{ runner.temp }}/package
+
+      # A tarball publish runs no lifecycle scripts; the check job built dist/.
+      - run: npm publish "$RUNNER_TEMP"/package/*.tgz

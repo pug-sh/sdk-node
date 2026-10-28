@@ -23,6 +23,7 @@ mirrored under `proto/` from a **pinned** BSR commit. See the `Makefile`:
 | `make protos`       | `buf generate` (local `protoc-gen-es`) → `src/gen/`, then `make typed-events`. Offline. |
 | `make typed-events` | Regenerate `src/well-known-events.generated.ts` from a throwaway compile of `src/gen`. |
 | `make proto-latest` | Print the newest commit on the module's `main` branch (to bump `PROTO_COMMIT`).        |
+| `make check-proto-pin` | Re-export the pinned commit and fail if `proto/` differs from it. Release gate; needs BSR network. |
 
 To take a newer schema: run `make proto-latest`, set `PROTO_COMMIT` in the `Makefile`, then
 `make sync-protos && make protos`, and review + commit the `proto/` + `src/gen/` diff. Builds and
@@ -93,3 +94,15 @@ definition), and unknown kinds fall back to the loose-property heuristic.
   console spies that confirm the failure was logged.
 
 Before opening a PR: `bun run lint && bun run test && bun run build`.
+
+## Releasing
+
+Bump `version` in `package.json`, run `bun run build` to restamp `src/version.ts`, commit as
+`Release vX.Y.Z`, then tag `vX.Y.Z` and push the commit and the tag. The tag runs
+`.github/workflows/release.yml`: it checks that the tag names `package.json`'s version, runs
+`make check-proto-pin ci`, packs, and publishes that tarball to npm through trusted publishing, with
+provenance.
+
+One-time setup: npmjs.com → `@pug-sh/node` → Settings → **Trusted publishing** → GitHub Actions,
+organization `pug-sh`, repository `sdk-node`, workflow `release.yml`. It must make its first publish
+within 2 days of being added.
