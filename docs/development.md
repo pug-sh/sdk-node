@@ -104,5 +104,6 @@ Bump `version` in `package.json`, run `bun run build` to restamp `src/version.ts
 provenance.
 
 One-time setup: npmjs.com → `@pug-sh/node` → Settings → **Trusted publishing** → GitHub Actions,
-organization `pug-sh`, repository `sdk-node`, workflow `release.yml`. It must make its first publish
-within 2 days of being added.
+organization `pug-sh`, repository `sdk-node`, workflow `release.yml`, with `npm publish` allowed: a
+new configuration allows only `npm stage publish` by default, which rejects the workflow's
+`npm publish`. It must make its first publish within 2 days of being added.

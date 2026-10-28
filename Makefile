@@ -58,9 +58,12 @@ typed-events:
 # output (src/gen, rewritten by `protos`) and the derived typed-event registry. In `ci`, `protos`
 # runs first (ordering guaranteed by .NOTPARALLEL), so this diff catches drift in either one; a
 # change under sdk/**, shared/**, or a non-event common/** schema no longer slips through unseen.
+# `git diff` skips untracked files, so a newly generated file nobody committed is listed separately;
+# tsc would otherwise compile it into dist/ unnoticed.
 check-codegen: typed-events
 	@git diff --exit-code -- src/gen src/well-known-events.generated.ts \
-	  || { echo "codegen drift — run 'make protos' and commit"; exit 1; }
+	  && test -z "$$(git ls-files --others --exclude-standard -- src/gen)" \
+	  || { git ls-files --others --exclude-standard -- src/gen; echo "codegen drift — run 'make protos' and commit"; exit 1; }
 
 # Print the newest commit on the module's main branch, to update PROTO_COMMIT above.
 proto-latest:
