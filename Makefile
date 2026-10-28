@@ -2,7 +2,7 @@
 # published package carries generated code (src/gen), so consumers just `npm install` with no
 # Buf Schema Registry entry in their .npmrc.
 
-.PHONY: sync-protos protos typed-events check-codegen proto-latest build lint test check ci
+.PHONY: sync-protos protos typed-events check-codegen check-proto-pin proto-latest build lint test check ci
 
 # These recipes have order-only dependencies that make's prerequisite lists don't fully express
 # (e.g. `ci` must run `protos` before `check-codegen` diffs src/gen, and `protos` rewrites files
@@ -16,21 +16,28 @@
 PROTO_MODULE  := buf.build/pugsh/pug
 PROTO_COMMIT  := 8b5d0680b10c4693b4d9d15d3dbfc663
 
-# Re-vendor proto/ from the pinned BSR commit. `buf export` is a read-only download; --path is an
-# allowlist and buf pulls in transitive imports (buf/validate, google WKTs) automatically. Node is
-# a server SDK, so unlike the web client it also vendors the shared/** services it consumes. Add a
-# --path when the SDK starts consuming a new package.
+# The --path allowlist for `buf export`; buf pulls in transitive imports (buf/validate, google WKTs)
+# automatically. Node is a server SDK, so unlike the web client it also vendors the shared/**
+# services it consumes. Add a --path when the SDK starts consuming a new package.
+PROTO_PATHS := --path sdk --path common/events/v1 --path common/v1/property_value.proto \
+  --path shared/activity/v1 --path shared/insights/v1 --path shared/profiles/v1
+
+# Re-vendor proto/ from the pinned BSR commit. `buf export` is a read-only download.
 sync-protos:
 	@command -v buf >/dev/null || { echo "buf CLI required: https://buf.build/docs/installation"; exit 1; }
 	rm -rf proto
-	buf export $(PROTO_MODULE):$(PROTO_COMMIT) --output proto \
-	  --path sdk \
-	  --path common/events/v1 \
-	  --path common/v1/property_value.proto \
-	  --path shared/activity/v1 \
-	  --path shared/insights/v1 \
-	  --path shared/profiles/v1
+	buf export $(PROTO_MODULE):$(PROTO_COMMIT) --output proto $(PROTO_PATHS)
 	@echo "Synced SDK protos into proto/ at $(PROTO_COMMIT). Run 'make protos' to regenerate src/gen."
+
+# Release gate: proto/ must be exactly what the pinned commit exports, so nothing ships hand-patched
+# ahead of the pin. It needs BSR network access, so the release workflow runs it, not CI.
+check-proto-pin:
+	@command -v buf >/dev/null || { echo "buf CLI required: https://buf.build/docs/installation"; exit 1; }
+	@rm -rf .proto-pin-check
+	@buf export $(PROTO_MODULE):$(PROTO_COMMIT) --output .proto-pin-check $(PROTO_PATHS)
+	@diff -r proto .proto-pin-check \
+	  && { rm -rf .proto-pin-check; echo "proto/ matches $(PROTO_MODULE):$(PROTO_COMMIT)."; } \
+	  || { rm -rf .proto-pin-check; echo "proto/ diverges from $(PROTO_COMMIT): bump PROTO_COMMIT, then 'make sync-protos protos'."; exit 1; }
 
 # Regenerate committed protobuf-es TypeScript from the vendored proto/ mirror, then refresh the
 # typed track() surface derived from it. protoc-gen-es is a devDependency, from node_modules/.bin.
@@ -51,9 +58,12 @@ typed-events:
 # output (src/gen, rewritten by `protos`) and the derived typed-event registry. In `ci`, `protos`
 # runs first (ordering guaranteed by .NOTPARALLEL), so this diff catches drift in either one; a
 # change under sdk/**, shared/**, or a non-event common/** schema no longer slips through unseen.
+# `git diff` skips untracked files, so a newly generated file nobody committed is listed separately;
+# tsc would otherwise compile it into dist/ unnoticed.
 check-codegen: typed-events
 	@git diff --exit-code -- src/gen src/well-known-events.generated.ts \
-	  || { echo "codegen drift — run 'make protos' and commit"; exit 1; }
+	  && test -z "$$(git ls-files --others --exclude-standard -- src/gen)" \
+	  || { git ls-files --others --exclude-standard -- src/gen; echo "codegen drift — run 'make protos' and commit"; exit 1; }
 
 # Print the newest commit on the module's main branch, to update PROTO_COMMIT above.
 proto-latest:
