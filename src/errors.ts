@@ -2,7 +2,7 @@ import { Code, ConnectError } from '@connectrpc/connect'
 
 /**
  * Error surfaced by the read methods (profiles/activity/insights). Ingestion
- * (track/identify) never throws — it logs and drops — so these are read-only.
+ * (track/identify) never throws (it logs and drops), so these are read-only.
  */
 export class PugError extends Error {
   readonly code?: Code

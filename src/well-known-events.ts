@@ -45,7 +45,7 @@ export type WellKnownEventPropsMap = { [K in WellKnownEventName]: MessageInitSha
 /**
  * Overloaded track signature. The first overload narrows `props` for well-known events;
  * the second accepts any string kind with loose props. `distinctId` (who the event is
- * for) is required first — a server SDK has no ambient user. Runtime validation in
+ * for) is required first; a server SDK has no ambient user. Runtime validation in
  * track.ts is the real safety net if the typed overload is bypassed.
  */
 export type TrackFn = {

@@ -1,7 +1,7 @@
 {
   "name": "@pug-sh/node",
   "version": "0.0.7",
-  "description": "Pug server-side SDK for Node.js — event tracking, profile identify, and analytics reads.",
+  "description": "Pug server-side SDK for Node.js: event tracking, profile identify, and analytics reads.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

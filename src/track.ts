@@ -52,7 +52,7 @@ export const formatValidationError = (result: ReturnType<typeof validator.valida
 
 // proto's `string.max_len` limits to 1024 *code points*; we cap at 1024 *bytes* instead.
 // A UTF-8 byte count is always >= the code-point count, so a 1024-byte cap yields <= 1024
-// code points — strictly more conservative than the proto limit, never looser.
+// code points, strictly more conservative than the proto limit, never looser.
 const MAX_STRING_BYTES = 1024
 const utf8ByteLength = (s: string): number => new TextEncoder().encode(s).byteLength
 
@@ -322,7 +322,7 @@ const mapPropsViaHeuristic = (
 }
 
 // Proto Timestamp tops out at year 9999; a value past it (or negative/fractional) is almost
-// certainly a unit mistake — seconds or microseconds passed where epoch milliseconds are expected.
+// certainly a unit mistake: seconds or microseconds passed where epoch milliseconds are expected.
 const MAX_OCCUR_TIME_MS = 253_402_300_799_000
 
 /** `0` (the Unix epoch) is a real timestamp; anything out of range falls back rather than throwing. */
@@ -355,7 +355,7 @@ const LOCATION_FIELD_NAMES = Object.keys(LOCATION_FIELDS).join(', ')
 
 // Mirrors internal/geo/countries.go. The server stores $country unvalidated and only the
 // choropleth filters it, so a bad code is aggregated into a permanent rollup dimension and
-// then simply missing from the map. "XX" — Cloudflare's unknown — passes a two-letter check.
+// then simply missing from the map. "XX" (Cloudflare's unknown) passes a two-letter check.
 const COUNTRY_CODES = new Set(
   (
     'AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ ' +
@@ -379,7 +379,7 @@ const makeDoubleValue = (value: number): PropertyValue =>
 /**
  * Renders TrackOptions.location as geo auto-properties. The server skips geo enrichment on
  * private-key requests, which is all this SDK makes, so these keys are the only geo the event
- * will ever carry — a dropped field is a permanent hole, not one filled in later.
+ * will ever carry; a dropped field is a permanent hole, not one filled in later.
  */
 const locationProps = (location: EventLocation | undefined, kind: string): Record<string, PropertyValue> => {
   const props: Record<string, PropertyValue> = {}
