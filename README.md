@@ -20,33 +20,33 @@ Requires Node.js 18 or newer.
 ## Quick start
 
 ```ts
-import { Pug } from "@pug-sh/node";
+import { Pug } from '@pug-sh/node'
 
 const pug = new Pug({
   apiKey: process.env.PUG_API_KEY!,
-  endpoint: "https://pug.example.com",
-});
+  endpoint: 'https://pug.example.com',
+})
 
 // Track an event. `distinctId` (who the event is for) comes first; a server has no ambient user.
-pug.track("user_42", "order.completed", { amount: 49.0, currency: "USD" });
+pug.track('user_42', 'order.completed', { amount: 49.0, currency: 'USD' })
 
 // Well-known events get typed properties (autocomplete + validation).
-pug.track("user_42", "feature_used", { featureId: "export" });
+pug.track('user_42', 'feature_used', { featureId: 'export' })
 
 // Identify a profile. Queued and sent in batches like events; never throws.
-pug.identify("user_42", { email: "ada@example.com", plan: "pro" });
+pug.identify('user_42', { email: 'ada@example.com', plan: 'pro' })
 
 // Reads (require a private key; throw PugError).
-const profile = await pug.profiles.getByExternalId("user_42");
+const profile = await pug.profiles.getByExternalId('user_42')
 for await (const p of pug.profiles.list()) {
-  console.log(p.externalId);
+  console.log(p.externalId)
 }
 const trend = await pug.insights.query({
   /* spec, timeRange, granularity */
-});
+})
 
 // Drain on shutdown so nothing queued is lost.
-await pug.close();
+await pug.close()
 ```
 
 ## Behaviour
@@ -84,7 +84,7 @@ new Pug({
   onError: (err, { events, identifies }) => {
     /* dead-letter sink; one of the two lists is empty */
   },
-});
+})
 ```
 
 ### Ingestion (never throws)
@@ -107,9 +107,14 @@ private key, so the server adds no geo of its own; without `location`, an event 
 at all:
 
 ```ts
-pug.track('user-123', 'checkout_completed', { plan: 'pro' }, {
-  location: { country: 'DE', city: 'Berlin' },
-});
+pug.track(
+  'user-123',
+  'checkout_completed',
+  { plan: 'pro' },
+  {
+    location: { country: 'DE', city: 'Berlin' },
+  },
+)
 ```
 
 Fields: `continent`, `country`, `region`, `city`, `postalCode`, `metroCode`, `timezone`,
