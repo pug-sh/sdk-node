@@ -17,13 +17,13 @@ code is committed under `src/gen/` (compiled into `dist/gen/` and shipped), so a
 `npm install` needs **no `@buf` registry entry** in their `.npmrc`. The `.proto` sources are
 mirrored under `proto/` from a **pinned** BSR commit. See the `Makefile`:
 
-| Command             | What it does                                                                          |
-| ------------------- | ------------------------------------------------------------------------------------- |
-| `make sync-protos`  | `buf export buf.build/pugsh/pug:$(PROTO_COMMIT)` (read-only) → `proto/` mirror, allowlisted to the SDK packages (incl. the server-only `shared/**`). Needs BSR network. |
-| `make protos`       | `buf generate` (local `protoc-gen-es`) → `src/gen/`, then `make typed-events`. Offline. |
-| `make typed-events` | Regenerate `src/well-known-events.generated.ts` from a throwaway compile of `src/gen`. |
-| `make proto-latest` | Print the newest commit on the module's `main` branch (to bump `PROTO_COMMIT`).        |
-| `make check-proto-pin` | Re-export the pinned commit and fail if `proto/` differs from it. Release gate; needs BSR network. |
+| Command                | What it does                                                                                                                                                            |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `make sync-protos`     | `buf export buf.build/pugsh/pug:$(PROTO_COMMIT)` (read-only) → `proto/` mirror, allowlisted to the SDK packages (incl. the server-only `shared/**`). Needs BSR network. |
+| `make protos`          | `buf generate` (local `protoc-gen-es`) → `src/gen/`, then `make typed-events`. Offline.                                                                                 |
+| `make typed-events`    | Regenerate `src/well-known-events.generated.ts` from a throwaway compile of `src/gen`.                                                                                  |
+| `make proto-latest`    | Print the newest commit on the module's `main` branch (to bump `PROTO_COMMIT`).                                                                                         |
+| `make check-proto-pin` | Re-export the pinned commit and fail if `proto/` differs from it. Release gate; needs BSR network.                                                                      |
 
 To take a newer schema: run `make proto-latest`, set `PROTO_COMMIT` in the `Makefile`, then
 `make sync-protos && make protos`, and review + commit the `proto/` + `src/gen/` diff. Builds and
@@ -37,14 +37,14 @@ bun install   # or: npm install — no .npmrc / registry config needed
 
 ## Scripts
 
-| Command              | What it does                                                       |
-| -------------------- | ----------------------------------------------------------------- |
-| `bun run build`      | `prebuild` (stamp `version.ts`) → `tsc` → `dist/`                  |
-| `bun run watch`      | `tsc -w` incremental rebuilds                                     |
-| `bun run test`       | `vitest run` (one-shot)                                           |
-| `bun run test:watch` | `vitest` in watch mode                                            |
-| `bun run lint`       | `biome check --write .` (lint + format + organize imports)       |
-| `bun run format`     | `biome format --write .`                                          |
+| Command              | What it does                                               |
+| -------------------- | ---------------------------------------------------------- |
+| `bun run build`      | `prebuild` (stamp `version.ts`) → `tsc` → `dist/`          |
+| `bun run watch`      | `tsc -w` incremental rebuilds                              |
+| `bun run test`       | `vitest run` (one-shot)                                    |
+| `bun run test:watch` | `vitest` in watch mode                                     |
+| `bun run lint`       | `biome check --write .` (lint + format + organize imports) |
+| `bun run format`     | `biome format --write .`                                   |
 
 `prebuild` only stamps `src/version.ts` (`SDK_VERSION` from `package.json`, applied to every
 event's auto-properties). The protobuf code and the well-known-event catalog are **not**
@@ -72,16 +72,16 @@ definition), and unknown kinds fall back to the loose-property heuristic.
 
 ## Source layout
 
-| File                          | Responsibility                                                     |
-| ----------------------------- | ------------------------------------------------------------------ |
-| `pug.ts`                      | `Pug` client — ingestion (`track`/`identify`) + reads facade.      |
+| File                          | Responsibility                                                      |
+| ----------------------------- | ------------------------------------------------------------------- |
+| `pug.ts`                      | `Pug` client — ingestion (`track`/`identify`) + reads facade.       |
 | `track.ts`                    | `toEvent` — builds/validates Event protos, maps JS → PropertyValue. |
-| `batch.ts`                    | In-memory batching transport: buffer, flush, retry, dead-letter.   |
-| `rpc.ts` / `api-transport.ts` | Connect clients + transport with the `x-api-key` interceptor.      |
-| `transport.ts`                | Adapts the events client into the batch transport's `EventSink`.   |
-| `errors.ts`                   | `PugError` + `toPugError` normalization.                           |
+| `batch.ts`                    | In-memory batching transport: buffer, flush, retry, dead-letter.    |
+| `rpc.ts` / `api-transport.ts` | Connect clients + transport with the `x-api-key` interceptor.       |
+| `transport.ts`                | Adapts the events client into the batch transport's `EventSink`.    |
+| `errors.ts`                   | `PugError` + `toPugError` normalization.                            |
 | `well-known-events.ts`        | Public `TrackFn` / `TrackOptions` types over the generated catalog. |
-| `logger.ts`, `utils.ts`       | Console logger + constants (default endpoint/timeout).             |
+| `logger.ts`, `utils.ts`       | Console logger + constants (default endpoint/timeout).              |
 
 ## Testing notes
 
