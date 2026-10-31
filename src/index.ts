@@ -1,7 +1,7 @@
 export type { JsonObject, JsonValue } from '@bufbuild/protobuf'
-export type { BatchConfig, OnError } from './batch.js'
+export type { BatchConfig } from './batch.js'
 export { PugError } from './errors.js'
-export type { IdentifyOptions, Options } from './pug.js'
+export type { IdentifyOptions, OnError, Options, Undelivered } from './pug.js'
 export { Pug } from './pug.js'
 export type {
   EventLocation,

@@ -10,11 +10,11 @@
 .NOTPARALLEL:
 
 # BSR module + pinned commit that proto/ is vendored from. The pin makes `make sync-protos`
-# reproducible and taking newer upstream protos a deliberate, reviewable change — builds and CI
+# reproducible and taking newer upstream protos a deliberate, reviewable change. Builds and CI
 # never touch BSR (proto/ + src/gen are committed). To bump: run `make proto-latest` for the
 # newest commit, set PROTO_COMMIT below, then `make sync-protos && make protos` and review the diff.
 PROTO_MODULE  := buf.build/pugsh/pug
-PROTO_COMMIT  := 8b5d0680b10c4693b4d9d15d3dbfc663
+PROTO_COMMIT  := 35d2a94a2a654a45a773e9184e3f6324
 
 # The --path allowlist for `buf export`; buf pulls in transitive imports (buf/validate, google WKTs)
 # automatically. Node is a server SDK, so unlike the web client it also vendors the shared/**
@@ -54,7 +54,7 @@ typed-events:
 	node scripts/gen-well-known-events.mjs
 	rm -rf .codegen-tmp
 
-# CI gate: the whole committed generated tree must match a fresh generate — both the protobuf-es
+# CI gate: the whole committed generated tree must match a fresh generate: both the protobuf-es
 # output (src/gen, rewritten by `protos`) and the derived typed-event registry. In `ci`, `protos`
 # runs first (ordering guaranteed by .NOTPARALLEL), so this diff catches drift in either one; a
 # change under sdk/**, shared/**, or a non-event common/** schema no longer slips through unseen.
@@ -63,7 +63,7 @@ typed-events:
 check-codegen: typed-events
 	@git diff --exit-code -- src/gen src/well-known-events.generated.ts \
 	  && test -z "$$(git ls-files --others --exclude-standard -- src/gen)" \
-	  || { git ls-files --others --exclude-standard -- src/gen; echo "codegen drift — run 'make protos' and commit"; exit 1; }
+	  || { git ls-files --others --exclude-standard -- src/gen; echo "codegen drift: run 'make protos' and commit"; exit 1; }
 
 # Print the newest commit on the module's main branch, to update PROTO_COMMIT above.
 proto-latest:
