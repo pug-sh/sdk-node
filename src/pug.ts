@@ -1,13 +1,20 @@
-import { create } from '@bufbuild/protobuf'
+import { create, fromBinary, toBinary } from '@bufbuild/protobuf'
 import { createValidator } from '@bufbuild/protovalidate'
 import { uuidv7 } from 'uuidv7'
-import { type BatchConfig, type BatchedTransport, createBatchedTransport, type OnError } from './batch.js'
+import {
+  type BatchConfig,
+  type BatchedTransport,
+  createBatchedTransport,
+  IDENTIFY_NAMES,
+  resolveBatchConfig,
+} from './batch.js'
 import { toPugError } from './errors.js'
-import { IdentifyRequestSchema } from './gen/sdk/profiles/v1/profiles_pb.js'
+import { type Event, EventSchema } from './gen/sdk/events/v1/events_pb.js'
+import { type IdentifyRequest, IdentifyRequestSchema } from './gen/sdk/profiles/v1/profiles_pb.js'
 import { log } from './logger.js'
 import { createRpcClients, type RpcClients } from './rpc.js'
 import { formatValidationError, type JsonValue, type TrackFn, type TrackOptions, toEvent } from './track.js'
-import { createEventSink } from './transport.js'
+import { createEventSink, createIdentifySink } from './transport.js'
 import { DEFAULT_ENDPOINT, isPlainObject } from './utils.js'
 
 export interface Options {
@@ -15,15 +22,22 @@ export interface Options {
   readonly apiKey: string
   /** Pug server origin. Defaults to the hosted endpoint. */
   readonly endpoint?: string
-  /** Batching overrides for the ingestion buffer. */
+  /** Batching overrides; events and identifies each get a queue with these settings. */
   readonly batch?: Partial<BatchConfig>
   /**
-   * Dead-letter / diagnostics hook for buffered `track()` events that could not be delivered
-   * (permanent send failure, queue overflow, or still-undelivered at `close()`). `identify()`
-   * failures are logged, not routed here.
+   * Dead-letter / diagnostics hook for queued events and identifies that could not be delivered
+   * (permanent send failure, queue overflow, or still-undelivered at `close()`).
    */
   readonly onError?: OnError
 }
+
+/** What one failure lost. Either list may be empty. */
+export interface Undelivered {
+  readonly events: Event[]
+  readonly identifies: IdentifyRequest[]
+}
+
+export type OnError = (err: unknown, lost: Undelivered) => void
 
 export interface IdentifyOptions {
   /** SDK anonymous id (must start with "anon-"). Triggers anon→identified merge. */
@@ -33,9 +47,28 @@ export interface IdentifyOptions {
 
 const validator = createValidator()
 
+// NATS refuses a message over 1 MiB and an item can't be split, so an oversized one would fail
+// every send. The margin is for what the server adds.
+const MAX_ITEM_BYTES = 900 << 10
+
+// An oversized request gets a transient code and would retry forever. BatchCreate is published as
+// one NATS message; BatchIdentify is split, so it only has to fit the 8 MiB request limit.
+const MAX_EVENT_BATCH_BYTES = 512 << 10
+const MAX_IDENTIFY_BATCH_BYTES = 4 << 20
+
+const eventSize = (event: Event): number => toBinary(EventSchema, event).byteLength
+
+const identifySize = (req: IdentifyRequest): number => toBinary(IdentifyRequestSchema, req).byteLength
+
+const hasNonFinite = (value: JsonValue): boolean =>
+  typeof value === 'number'
+    ? !Number.isFinite(value)
+    : typeof value === 'object' && value !== null && Object.values(value).some(hasNonFinite)
+
 export class Pug {
   private readonly rpc: RpcClients
-  private readonly transport: BatchedTransport
+  private readonly eventQueue: BatchedTransport<Event>
+  private readonly identifyQueue: BatchedTransport<IdentifyRequest>
   private readonly sessionId = uuidv7()
   private closed = false
 
@@ -49,7 +82,21 @@ export class Pug {
     const endpoint = options.endpoint || DEFAULT_ENDPOINT
 
     this.rpc = createRpcClients(endpoint, options.apiKey)
-    this.transport = createBatchedTransport(createEventSink(this.rpc.events), options.batch, options.onError)
+    // Resolved once, so an invalid setting warns once rather than once per queue.
+    const batch = resolveBatchConfig(options.batch)
+    const onError = options.onError
+    this.eventQueue = createBatchedTransport(
+      createEventSink(this.rpc.events),
+      batch,
+      (err, events) => onError?.(err, { events, identifies: [] }),
+      { sizeOf: eventSize, maxBytes: MAX_EVENT_BATCH_BYTES },
+    )
+    this.identifyQueue = createBatchedTransport(
+      createIdentifySink(this.rpc.profilesSdk),
+      batch,
+      (err, identifies) => onError?.(err, { events: [], identifies }),
+      { names: IDENTIFY_NAMES, sizeOf: identifySize, maxBytes: MAX_IDENTIFY_BATCH_BYTES },
+    )
   }
 
   // --- ingestion (never throws) --------------------------------------------
@@ -77,14 +124,23 @@ export class Pug {
       if (!event) {
         return // toEvent already logged the reason
       }
-      this.transport.send(event)
+      const size = eventSize(event)
+      if (size > MAX_ITEM_BYTES) {
+        log.error(`track("${kind}") dropped: ${size} bytes exceeds the ${MAX_ITEM_BYTES}-byte limit.`)
+        return
+      }
+      this.eventQueue.send(event)
     } catch (err) {
       log.error(`Unexpected error in track("${kind}"):`, err)
     }
   }
 
-  /** Create or update a profile. Never throws — failures are logged. */
-  async identify(externalId: string, traits?: Record<string, JsonValue>, opts?: IdentifyOptions): Promise<void> {
+  /**
+   * Queue a create-or-update of the profile for `externalId`; traits are shallow-merged into the
+   * stored ones. Non-blocking and throw-free like `track()`: identifies are sent in batches, and
+   * invalid input is logged and dropped.
+   */
+  identify(externalId: string, traits?: Record<string, JsonValue>, opts?: IdentifyOptions): void {
     try {
       if (this.closed) {
         log.warn('identify() called after close().')
@@ -112,28 +168,43 @@ export class Pug {
         return
       }
 
-      await this.rpc.profilesSdk.identify(req)
+      const bytes = toBinary(IdentifyRequestSchema, req)
+      if (bytes.byteLength > MAX_ITEM_BYTES) {
+        log.error(`identify() dropped: ${bytes.byteLength} bytes exceeds the ${MAX_ITEM_BYTES}-byte limit.`)
+        return
+      }
+      // A copy, so a later change to the caller's traits can't alter what is sent.
+      const queued = fromBinary(IdentifyRequestSchema, bytes)
+      // The server would store NaN or Infinity as strings.
+      const queuedTraits = queued.traits ?? {}
+      for (const [key, value] of Object.entries(queuedTraits)) {
+        if (hasNonFinite(value)) {
+          log.warn(`Trait "${key}" not representable (NaN or Infinity), skipping`)
+          delete queuedTraits[key]
+        }
+      }
+      this.identifyQueue.send(queued)
     } catch (err) {
       log.error(`Failed to identify "${externalId}":`, err)
     }
   }
 
   /**
-   * Send the currently-buffered events now. Resolves when that batch attempt settles —
-   * not a guarantee the queue is empty, since a transient failure re-queues for a later
+   * Send the currently-queued events and identifies now. Resolves when those attempts settle,
+   * not a guarantee the queues are empty, since a transient failure re-queues for a later
    * flush. Use `close()` to drain fully on shutdown.
    */
-  flush(): Promise<void> {
-    return this.transport.flush()
+  async flush(): Promise<void> {
+    await Promise.all([this.eventQueue.flush(), this.identifyQueue.flush()])
   }
 
   /**
-   * Drain and shut down; call on graceful exit. Buffered events are flushed, and anything still
-   * undeliverable is reported via `onError` (not retried). Later track/identify calls warn + drop.
+   * Drain and shut down; call on graceful exit. Queued events and identifies are flushed, and anything
+   * still undeliverable is reported via `onError` (not retried). Later track/identify calls warn + drop.
    */
-  close(): Promise<void> {
+  async close(): Promise<void> {
     this.closed = true
-    return this.transport.close()
+    await Promise.all([this.eventQueue.close(), this.identifyQueue.close()])
   }
 
   // --- reads (private key; throw PugError) ---------------------------------
@@ -186,7 +257,7 @@ export class Pug {
     }
   }
 
-  /** Reads are NOT auto-retried — the caller owns timeout/retry. Errors normalize to PugError. */
+  /** Reads are NOT auto-retried; the caller owns timeout/retry. Errors normalize to PugError. */
   private async read<T>(fn: () => Promise<T>): Promise<T> {
     try {
       return await fn()

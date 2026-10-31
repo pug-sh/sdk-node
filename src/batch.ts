@@ -1,5 +1,4 @@
 import { ConnectError } from '@connectrpc/connect'
-import type { Event } from './gen/sdk/events/v1/events_pb.js'
 import { log } from './logger.js'
 
 export interface BatchConfig {
@@ -14,7 +13,7 @@ const DEFAULT_BATCH_CONFIG: BatchConfig = {
   maxQueueSize: 10_000,
 }
 
-/** Hard cap per BatchCreate request enforced by the events proto. */
+/** Hard cap per BatchCreate and BatchIdentify request, enforced by their protos. */
 const MAX_BATCH = 1000
 
 // gRPC codes that indicate client errors or server rejections retrying cannot fix:
@@ -30,32 +29,32 @@ const isPermanentError = (err: unknown): boolean => {
   return true
 }
 
-export interface EventSink {
-  sendBatch: (events: Event[]) => Promise<unknown>
+export interface Sink<T> {
+  sendBatch: (items: T[]) => Promise<unknown>
 }
 
-export type OnError = (err: unknown, events: Event[]) => void
+/** Thrown by a sink that delivered the first `sent` items of a batch before failing with `cause`. */
+export class PartialSendError extends Error {
+  readonly sent: number
 
-/**
- * In-memory batching transport. Events accumulate and flush on a size or interval
- * trigger; transient send failures keep events queued for retry, permanent failures
- * dead-letter via `onError`. `close()` drains and reports anything still undelivered.
- */
-export const createBatchedTransport = (
-  inner: EventSink,
-  partialConfig?: Partial<BatchConfig>,
-  onError: OnError = () => {},
-) => {
-  // A throwing onError must never abort the flush loop or the drain — that would drop the
-  // remaining chunks with neither a log nor a callback. Contain it here.
-  const safeOnError = (err: unknown, events: Event[]): void => {
-    try {
-      onError(err, events)
-    } catch (cbErr) {
-      log.error(`onError callback threw; ${events.length} event(s) may be lost:`, cbErr)
-    }
+  constructor(sent: number, cause: unknown) {
+    super(`batch failed after ${sent} item(s) were delivered`, { cause })
+    this.name = 'PartialSendError'
+    this.sent = sent
   }
+}
 
+export interface ItemNames {
+  readonly one: string
+  readonly many: string
+}
+
+export const IDENTIFY_NAMES: ItemNames = { one: 'identify', many: 'identifies' }
+
+const EVENT_NAMES: ItemNames = { one: 'event', many: 'events' }
+
+/** Defaults missing or invalid settings (warning on invalid) and clamps `maxSize` to the request cap. */
+export const resolveBatchConfig = (partialConfig?: Partial<BatchConfig>): BatchConfig => {
   const cfg = { ...DEFAULT_BATCH_CONFIG, ...partialConfig }
   const validated = (name: string, value: number, min: number, fallback: number): number => {
     // Counts (min >= 1) must be integers; a duration (maxWaitMs, min 0) may be fractional.
@@ -70,15 +69,47 @@ export const createBatchedTransport = (
     return value
   }
 
-  const requestedMaxSize = validated('maxSize', cfg.maxSize, 1, DEFAULT_BATCH_CONFIG.maxSize)
-  if (requestedMaxSize > MAX_BATCH) {
-    log.warn(`batch.maxSize exceeds the ${MAX_BATCH}-event proto cap, clamping to ${MAX_BATCH}.`)
+  const maxSize = validated('maxSize', cfg.maxSize, 1, DEFAULT_BATCH_CONFIG.maxSize)
+  if (maxSize > MAX_BATCH) {
+    log.warn(`batch.maxSize exceeds the ${MAX_BATCH}-item request cap, clamping to ${MAX_BATCH}.`)
   }
-  const maxSize = Math.min(MAX_BATCH, requestedMaxSize)
-  const maxWaitMs = validated('maxWaitMs', cfg.maxWaitMs, 0, DEFAULT_BATCH_CONFIG.maxWaitMs)
-  const maxQueueSize = validated('maxQueueSize', cfg.maxQueueSize, 1, DEFAULT_BATCH_CONFIG.maxQueueSize)
+  return {
+    maxSize: Math.min(MAX_BATCH, maxSize),
+    maxWaitMs: validated('maxWaitMs', cfg.maxWaitMs, 0, DEFAULT_BATCH_CONFIG.maxWaitMs),
+    maxQueueSize: validated('maxQueueSize', cfg.maxQueueSize, 1, DEFAULT_BATCH_CONFIG.maxQueueSize),
+  }
+}
 
-  let buffer: Event[] = []
+/**
+ * In-memory batching transport. Items accumulate and flush on a size or interval
+ * trigger; transient send failures keep items queued for retry, permanent failures
+ * dead-letter via `onError`. `close()` drains and reports anything still undelivered.
+ * With `sizeOf`, a request is also cut before its items pass `maxBytes`; a bigger item goes alone.
+ */
+export const createBatchedTransport = <T>(
+  inner: Sink<T>,
+  partialConfig?: Partial<BatchConfig>,
+  onError: (err: unknown, items: T[]) => void = () => {},
+  {
+    names = EVENT_NAMES,
+    sizeOf,
+    maxBytes = Number.POSITIVE_INFINITY,
+  }: { names?: ItemNames; sizeOf?: (item: T) => number; maxBytes?: number } = {},
+) => {
+  const count = (n: number): string => `${n} ${n === 1 ? names.one : names.many}`
+
+  // A throwing onError would abort the drain and silently drop the remaining chunks.
+  const safeOnError = (err: unknown, items: T[]): void => {
+    try {
+      onError(err, items)
+    } catch (cbErr) {
+      log.error(`onError callback threw; ${count(items.length)} may be lost:`, cbErr)
+    }
+  }
+
+  const { maxSize, maxWaitMs, maxQueueSize } = resolveBatchConfig(partialConfig)
+
+  let buffer: T[] = []
   let timer: ReturnType<typeof setTimeout> | null = null
   let inflight: Promise<void> = Promise.resolve()
   let closed = false
@@ -103,77 +134,101 @@ export const createBatchedTransport = (
     timer.unref?.()
   }
 
-  // Sends one chunk. Returns the chunk if it should be retried (transient failure on an open
-  // client), or null if it was delivered or dead-lettered. The caller re-queues all retryable
-  // chunks together so a multi-chunk flush preserves event order.
-  const sendChunk = async (chunk: Event[]): Promise<Event[] | null> => {
+  const chunkEnd = (batch: T[], start: number): number => {
+    let end = start
+    let bytes = 0
+    while (end < batch.length && end - start < maxSize) {
+      const size = sizeOf?.(batch[end]) ?? 0
+      if (end > start && bytes + size > maxBytes) {
+        break
+      }
+      bytes += size
+      end++
+    }
+    return end
+  }
+
+  const sendChunk = async (chunk: T[]): Promise<{ err: unknown; unsent: T[] } | null> => {
     try {
       await inner.sendBatch(chunk)
       return null
-    } catch (err) {
+    } catch (thrown) {
+      let err = thrown
+      let unsent = chunk
+      if (thrown instanceof PartialSendError) {
+        err = thrown.cause
+        unsent = chunk.slice(thrown.sent)
+      }
       if (isPermanentError(err)) {
-        log.error(`Permanent error, ${chunk.length} event(s) dropped (will NOT retry):`, err)
-        safeOnError(err, chunk)
+        log.error(`Permanent error, ${count(unsent.length)} dropped (will NOT retry):`, err)
+        safeOnError(err, unsent)
         return null
       }
-      if (closed) {
-        log.error(`Client closed, ${chunk.length} event(s) dropped after transient error:`, err)
-        safeOnError(err, chunk)
-        return null
-      }
-      log.warn('Transient error sending batch, will retry:', err)
-      return chunk
+      return { err, unsent }
     }
+  }
+
+  // Drains are serialized so a retry goes out ahead of anything queued after it.
+  let queued: Promise<void> | null = null
+  // Set while a retry waits out maxWaitMs, so new items reaching maxSize don't cut the wait short.
+  let retrying = false
+
+  const drain = async (): Promise<void> => {
+    queued = null
+    const batch = buffer.splice(0, buffer.length)
+    let start = 0
+    while (start < batch.length) {
+      const end = chunkEnd(batch, start)
+      const failed = await sendChunk(batch.slice(start, end))
+      start = end
+      if (!failed) {
+        continue
+      }
+      // Later chunks wait too: sent now, they would land ahead of the retry.
+      const unsent = failed.unsent.concat(batch.slice(end))
+      if (closed) {
+        log.error(`Client closed, ${count(unsent.length)} dropped after transient error:`, failed.err)
+        safeOnError(failed.err, unsent)
+        return
+      }
+      log.warn(`Transient error sending ${count(failed.unsent.length)}, will retry:`, failed.err)
+      // concat, not unshift(...): spreading a large backlog into a call throws a RangeError.
+      buffer = unsent.concat(buffer)
+      const overflow = buffer.length - maxQueueSize
+      if (overflow > 0) {
+        log.warn(`Queue full, dropping oldest ${count(overflow)}`)
+        safeOnError(new Error(`queue overflow: dropped oldest ${count(overflow)}`), buffer.splice(0, overflow))
+      }
+      retrying = true
+      clearTimer()
+      scheduleFlush()
+      return
+    }
+    retrying = false
   }
 
   const flush = (): Promise<void> => {
     clearTimer()
-    if (buffer.length === 0) {
-      return inflight
-    }
-    const batch = buffer.splice(0, buffer.length)
-    const chunks: Event[][] = []
-    for (let i = 0; i < batch.length; i += maxSize) {
-      chunks.push(batch.slice(i, i + maxSize))
-    }
-    const run = (async () => {
-      const failed: Event[] = []
-      for (const chunk of chunks) {
-        const retry = await sendChunk(chunk)
-        if (retry) {
-          failed.push(...retry)
-        }
-      }
-      // Re-queue every retryable chunk in one shot, in original order, ahead of newer events.
-      if (failed.length > 0) {
-        buffer.unshift(...failed)
-        scheduleFlush()
-      }
-    })()
-    // sendChunk is total (never rejects), but chain on both settle paths so a future
-    // throw in run can't leave inflight rejected — close() awaits inflight to drain.
-    inflight = inflight.then(
-      () => run,
-      () => run,
-    )
-    return run
+    queued ??= inflight.then(drain, drain)
+    inflight = queued
+    return queued
   }
 
   return {
-    send: (event: Event): void => {
+    send: (item: T): void => {
       if (closed) {
-        safeOnError(new Error('client is closed'), [event])
+        safeOnError(new Error('client is closed'), [item])
         return
       }
       if (buffer.length >= maxQueueSize) {
         const dropped = buffer.shift()
         if (dropped) {
-          log.warn('Queue full, dropping oldest event')
-          safeOnError(new Error('queue overflow: dropped oldest event'), [dropped])
+          log.warn(`Queue full, dropping oldest ${names.one}`)
+          safeOnError(new Error(`queue overflow: dropped oldest ${names.one}`), [dropped])
         }
       }
-      buffer.push(event)
-      if (buffer.length >= maxSize) {
+      buffer.push(item)
+      if (buffer.length >= maxSize && !retrying) {
         void flush()
       } else {
         scheduleFlush()
@@ -186,13 +241,12 @@ export const createBatchedTransport = (
       closed = true
       clearTimer()
       await flush()
-      await inflight
       if (buffer.length > 0) {
         const undelivered = buffer.splice(0, buffer.length)
-        safeOnError(new Error(`client closed with ${undelivered.length} undelivered event(s)`), undelivered)
+        safeOnError(new Error(`client closed with ${count(undelivered.length)} undelivered`), undelivered)
       }
     },
   }
 }
 
-export type BatchedTransport = ReturnType<typeof createBatchedTransport>
+export type BatchedTransport<T> = ReturnType<typeof createBatchedTransport<T>>

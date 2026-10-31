@@ -320,7 +320,7 @@ describe('toEvent location', () => {
   })
 
   // Silence here would look identical to sending no location at all, while the event ships
-  // with no geo whatsoever — nothing on the server fills it in.
+  // with no geo whatsoever; nothing on the server fills it in.
   it('warns when no field is usable', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const e = location({ city: '', country: '' })

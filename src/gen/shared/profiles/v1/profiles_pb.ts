@@ -15,7 +15,7 @@ import type { JsonObject, Message } from "@bufbuild/protobuf";
  * Describes the file shared/profiles/v1/profiles.proto.
  */
 export const file_shared_profiles_v1_profiles: GenFile = /*@__PURE__*/
-  fileDesc("CiFzaGFyZWQvcHJvZmlsZXMvdjEvcHJvZmlsZXMucHJvdG8SEnNoYXJlZC5wcm9maWxlcy52MSIjCg1EZWxldGVSZXF1ZXN0EhIKAmlkGAEgASgJQga6SAPIAQEiNwoYRGVsZXRlRGF0YVN1YmplY3RSZXF1ZXN0EhsKC2V4dGVybmFsX2lkGAEgASgJQga6SAPIAQEiYQoORGVsZXRlUmVzcG9uc2USEgoKcmVxdWVzdF9pZBgBIAEoCRI7CgZzdGF0dXMYAiABKA4yKy5zaGFyZWQucHJvZmlsZXMudjEuQ29tcGxpYW5jZVJlcXVlc3RTdGF0dXMibAoZRGVsZXRlRGF0YVN1YmplY3RSZXNwb25zZRISCgpyZXF1ZXN0X2lkGAEgASgJEjsKBnN0YXR1cxgCIAEoDjIrLnNoYXJlZC5wcm9maWxlcy52MS5Db21wbGlhbmNlUmVxdWVzdFN0YXR1cyI3ChlHZXREZWxldGlvblJlcXVlc3RSZXF1ZXN0EhoKCnJlcXVlc3RfaWQYASABKAlCBrpIA8gBASKkAgoaR2V0RGVsZXRpb25SZXF1ZXN0UmVzcG9uc2USEgoKcmVxdWVzdF9pZBgBIAEoCRITCgtleHRlcm5hbF9pZBgCIAEoCRISCgpwcm9maWxlX2lkGAMgASgJEjsKBnN0YXR1cxgEIAEoDjIrLnNoYXJlZC5wcm9maWxlcy52MS5Db21wbGlhbmNlUmVxdWVzdFN0YXR1cxIZChFldmVudHNfaWRlbnRpZmllZBgFIAEoAxIwCgxyZXF1ZXN0ZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjAKDGNvbXBsZXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDQoFZXJyb3IYCCABKAkiSwoWR2V0QnlFeHRlcm5hbElkUmVxdWVzdBIbCgtleHRlcm5hbF9pZBgBIAEoCUIGukgDyAEBEhQKDGluY2x1ZGVfYm90cxgCIAEoCCJHChdHZXRCeUV4dGVybmFsSWRSZXNwb25zZRIsCgdwcm9maWxlGAEgASgLMhsuc2hhcmVkLnByb2ZpbGVzLnYxLlByb2ZpbGUiNgoKR2V0UmVxdWVzdBISCgJpZBgBIAEoCUIGukgDyAEBEhQKDGluY2x1ZGVfYm90cxgCIAEoCCI7CgtHZXRSZXNwb25zZRIsCgdwcm9maWxlGAEgASgLMhsuc2hhcmVkLnByb2ZpbGVzLnYxLlByb2ZpbGUicQoLRmlsdGVyR3JvdXASNAoHZmlsdGVycxgBIAMoCzIZLmNvbW1vbi52MS5Qcm9wZXJ0eUZpbHRlckIIukgFkgECCAESLAoIb3BlcmF0b3IYAiABKA4yGi5jb21tb24udjEuTG9naWNhbE9wZXJhdG9yIqsBCgtMaXN0UmVxdWVzdBISCgpwYWdlX3Rva2VuGAEgASgJEjYKDWZpbHRlcl9ncm91cHMYAiADKAsyHy5zaGFyZWQucHJvZmlsZXMudjEuRmlsdGVyR3JvdXASOgoWZmlsdGVyX2dyb3Vwc19vcGVyYXRvchgDIAEoDjIaLmNvbW1vbi52MS5Mb2dpY2FsT3BlcmF0b3ISFAoMaW5jbHVkZV9ib3RzGAQgASgIIlYKDExpc3RSZXNwb25zZRItCghwcm9maWxlcxgBIAMoCzIbLnNoYXJlZC5wcm9maWxlcy52MS5Qcm9maWxlEhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSLIAgoWUHJvZmlsZUFjdGl2aXR5U3VtbWFyeRIuCgpmaXJzdF9zZWVuGAEgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBItCglsYXN0X3NlZW4YAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhQKDHRvdGFsX2V2ZW50cxgDIAEoAxIRCglwYWdldmlld3MYBCABKAMSEAoIc2Vzc2lvbnMYBSABKAMSDwoHYnJvd3NlchgGIAEoCRIXCg9icm93c2VyX3ZlcnNpb24YByABKAkSCgoCb3MYCCABKAkSEgoKb3NfdmVyc2lvbhgJIAEoCRIOCgZkZXZpY2UYCiABKAkSDwoHY291bnRyeRgLIAEoCRIOCgZyZWdpb24YDCABKAkSDAoEY2l0eRgNIAEoCRILCgNib3QYDiABKAgiiwIKB1Byb2ZpbGUSLwoLY3JlYXRlX3RpbWUYASABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhMKC2V4dGVybmFsX2lkGAIgASgJEgoKAmlkGAMgASgJEisKCnByb3BlcnRpZXMYBCABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0EhIKCnByb2plY3RfaWQYBSABKAkSLwoLdXBkYXRlX3RpbWUYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjwKCGFjdGl2aXR5GAcgASgLMiouc2hhcmVkLnByb2ZpbGVzLnYxLlByb2ZpbGVBY3Rpdml0eVN1bW1hcnkq5AEKF0NvbXBsaWFuY2VSZXF1ZXN0U3RhdHVzEikKJUNPTVBMSUFOQ0VfUkVRVUVTVF9TVEFUVVNfVU5TUEVDSUZJRUQQABIlCiFDT01QTElBTkNFX1JFUVVFU1RfU1RBVFVTX1BFTkRJTkcQARIoCiRDT01QTElBTkNFX1JFUVVFU1RfU1RBVFVTX1BST0NFU1NJTkcQAhInCiNDT01QTElBTkNFX1JFUVVFU1RfU1RBVFVTX0NPTVBMRVRFRBADEiQKIENPTVBMSUFOQ0VfUkVRVUVTVF9TVEFUVVNfRkFJTEVEEAQy1gQKD1Byb2ZpbGVzU2VydmljZRJICgNHZXQSHi5zaGFyZWQucHJvZmlsZXMudjEuR2V0UmVxdWVzdBofLnNoYXJlZC5wcm9maWxlcy52MS5HZXRSZXNwb25zZSIAEmwKD0dldEJ5RXh0ZXJuYWxJZBIqLnNoYXJlZC5wcm9maWxlcy52MS5HZXRCeUV4dGVybmFsSWRSZXF1ZXN0Gisuc2hhcmVkLnByb2ZpbGVzLnYxLkdldEJ5RXh0ZXJuYWxJZFJlc3BvbnNlIgASTQoETGlzdBIfLnNoYXJlZC5wcm9maWxlcy52MS5MaXN0UmVxdWVzdBogLnNoYXJlZC5wcm9maWxlcy52MS5MaXN0UmVzcG9uc2UiADABElEKBkRlbGV0ZRIhLnNoYXJlZC5wcm9maWxlcy52MS5EZWxldGVSZXF1ZXN0GiIuc2hhcmVkLnByb2ZpbGVzLnYxLkRlbGV0ZVJlc3BvbnNlIgAScgoRRGVsZXRlRGF0YVN1YmplY3QSLC5zaGFyZWQucHJvZmlsZXMudjEuRGVsZXRlRGF0YVN1YmplY3RSZXF1ZXN0Gi0uc2hhcmVkLnByb2ZpbGVzLnYxLkRlbGV0ZURhdGFTdWJqZWN0UmVzcG9uc2UiABJ1ChJHZXREZWxldGlvblJlcXVlc3QSLS5zaGFyZWQucHJvZmlsZXMudjEuR2V0RGVsZXRpb25SZXF1ZXN0UmVxdWVzdBouLnNoYXJlZC5wcm9maWxlcy52MS5HZXREZWxldGlvblJlcXVlc3RSZXNwb25zZSIAQkhaRmdpdGh1Yi5jb20vcHVnLXNoL3B1Zy9pbnRlcm5hbC9nZW4vcHJvdG8vc2hhcmVkL3Byb2ZpbGVzL3YxO3Byb2ZpbGVzdjFiCGVkaXRpb25zcOgH", [file_buf_validate_validate, file_common_v1_filters, file_google_protobuf_struct, file_google_protobuf_timestamp]);
+  fileDesc("CiFzaGFyZWQvcHJvZmlsZXMvdjEvcHJvZmlsZXMucHJvdG8SEnNoYXJlZC5wcm9maWxlcy52MSIjCg1EZWxldGVSZXF1ZXN0EhIKAmlkGAEgASgJQga6SAPIAQEiNwoYRGVsZXRlRGF0YVN1YmplY3RSZXF1ZXN0EhsKC2V4dGVybmFsX2lkGAEgASgJQga6SAPIAQEiYQoORGVsZXRlUmVzcG9uc2USEgoKcmVxdWVzdF9pZBgBIAEoCRI7CgZzdGF0dXMYAiABKA4yKy5zaGFyZWQucHJvZmlsZXMudjEuQ29tcGxpYW5jZVJlcXVlc3RTdGF0dXMibAoZRGVsZXRlRGF0YVN1YmplY3RSZXNwb25zZRISCgpyZXF1ZXN0X2lkGAEgASgJEjsKBnN0YXR1cxgCIAEoDjIrLnNoYXJlZC5wcm9maWxlcy52MS5Db21wbGlhbmNlUmVxdWVzdFN0YXR1cyI3ChlHZXREZWxldGlvblJlcXVlc3RSZXF1ZXN0EhoKCnJlcXVlc3RfaWQYASABKAlCBrpIA8gBASKkAgoaR2V0RGVsZXRpb25SZXF1ZXN0UmVzcG9uc2USEgoKcmVxdWVzdF9pZBgBIAEoCRITCgtleHRlcm5hbF9pZBgCIAEoCRISCgpwcm9maWxlX2lkGAMgASgJEjsKBnN0YXR1cxgEIAEoDjIrLnNoYXJlZC5wcm9maWxlcy52MS5Db21wbGlhbmNlUmVxdWVzdFN0YXR1cxIZChFldmVudHNfaWRlbnRpZmllZBgFIAEoAxIwCgxyZXF1ZXN0ZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjAKDGNvbXBsZXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDQoFZXJyb3IYCCABKAkiSwoWR2V0QnlFeHRlcm5hbElkUmVxdWVzdBIbCgtleHRlcm5hbF9pZBgBIAEoCUIGukgDyAEBEhQKDGluY2x1ZGVfYm90cxgCIAEoCCJHChdHZXRCeUV4dGVybmFsSWRSZXNwb25zZRIsCgdwcm9maWxlGAEgASgLMhsuc2hhcmVkLnByb2ZpbGVzLnYxLlByb2ZpbGUiNgoKR2V0UmVxdWVzdBISCgJpZBgBIAEoCUIGukgDyAEBEhQKDGluY2x1ZGVfYm90cxgCIAEoCCI7CgtHZXRSZXNwb25zZRIsCgdwcm9maWxlGAEgASgLMhsuc2hhcmVkLnByb2ZpbGVzLnYxLlByb2ZpbGUicQoLRmlsdGVyR3JvdXASNAoHZmlsdGVycxgBIAMoCzIZLmNvbW1vbi52MS5Qcm9wZXJ0eUZpbHRlckIIukgFkgECCAESLAoIb3BlcmF0b3IYAiABKA4yGi5jb21tb24udjEuTG9naWNhbE9wZXJhdG9yIugBCgtMaXN0UmVxdWVzdBISCgpwYWdlX3Rva2VuGAEgASgJEjYKDWZpbHRlcl9ncm91cHMYAiADKAsyHy5zaGFyZWQucHJvZmlsZXMudjEuRmlsdGVyR3JvdXASOgoWZmlsdGVyX2dyb3Vwc19vcGVyYXRvchgDIAEoDjIaLmNvbW1vbi52MS5Mb2dpY2FsT3BlcmF0b3ISFAoMaW5jbHVkZV9ib3RzGAQgASgIEjsKBHNvcnQYBSABKA4yIy5zaGFyZWQucHJvZmlsZXMudjEuUHJvZmlsZUxpc3RTb3J0Qgi6SAWCAQIQASJWCgxMaXN0UmVzcG9uc2USLQoIcHJvZmlsZXMYASADKAsyGy5zaGFyZWQucHJvZmlsZXMudjEuUHJvZmlsZRIXCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAkiyAIKFlByb2ZpbGVBY3Rpdml0eVN1bW1hcnkSLgoKZmlyc3Rfc2VlbhgBIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLQoJbGFzdF9zZWVuGAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIUCgx0b3RhbF9ldmVudHMYAyABKAMSEQoJcGFnZXZpZXdzGAQgASgDEhAKCHNlc3Npb25zGAUgASgDEg8KB2Jyb3dzZXIYBiABKAkSFwoPYnJvd3Nlcl92ZXJzaW9uGAcgASgJEgoKAm9zGAggASgJEhIKCm9zX3ZlcnNpb24YCSABKAkSDgoGZGV2aWNlGAogASgJEg8KB2NvdW50cnkYCyABKAkSDgoGcmVnaW9uGAwgASgJEgwKBGNpdHkYDSABKAkSCwoDYm90GA4gASgIIosCCgdQcm9maWxlEi8KC2NyZWF0ZV90aW1lGAEgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBITCgtleHRlcm5hbF9pZBgCIAEoCRIKCgJpZBgDIAEoCRIrCgpwcm9wZXJ0aWVzGAQgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdBISCgpwcm9qZWN0X2lkGAUgASgJEi8KC3VwZGF0ZV90aW1lGAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBI8CghhY3Rpdml0eRgHIAEoCzIqLnNoYXJlZC5wcm9maWxlcy52MS5Qcm9maWxlQWN0aXZpdHlTdW1tYXJ5KuQBChdDb21wbGlhbmNlUmVxdWVzdFN0YXR1cxIpCiVDT01QTElBTkNFX1JFUVVFU1RfU1RBVFVTX1VOU1BFQ0lGSUVEEAASJQohQ09NUExJQU5DRV9SRVFVRVNUX1NUQVRVU19QRU5ESU5HEAESKAokQ09NUExJQU5DRV9SRVFVRVNUX1NUQVRVU19QUk9DRVNTSU5HEAISJwojQ09NUExJQU5DRV9SRVFVRVNUX1NUQVRVU19DT01QTEVURUQQAxIkCiBDT01QTElBTkNFX1JFUVVFU1RfU1RBVFVTX0ZBSUxFRBAEKpoBCg9Qcm9maWxlTGlzdFNvcnQSIQodUFJPRklMRV9MSVNUX1NPUlRfVU5TUEVDSUZJRUQQABIhCh1QUk9GSUxFX0xJU1RfU09SVF9DUkVBVEVfVElNRRABEiAKHFBST0ZJTEVfTElTVF9TT1JUX0ZJUlNUX1NFRU4QAhIfChtQUk9GSUxFX0xJU1RfU09SVF9MQVNUX1NFRU4QAzLWBAoPUHJvZmlsZXNTZXJ2aWNlEkgKA0dldBIeLnNoYXJlZC5wcm9maWxlcy52MS5HZXRSZXF1ZXN0Gh8uc2hhcmVkLnByb2ZpbGVzLnYxLkdldFJlc3BvbnNlIgASbAoPR2V0QnlFeHRlcm5hbElkEiouc2hhcmVkLnByb2ZpbGVzLnYxLkdldEJ5RXh0ZXJuYWxJZFJlcXVlc3QaKy5zaGFyZWQucHJvZmlsZXMudjEuR2V0QnlFeHRlcm5hbElkUmVzcG9uc2UiABJNCgRMaXN0Eh8uc2hhcmVkLnByb2ZpbGVzLnYxLkxpc3RSZXF1ZXN0GiAuc2hhcmVkLnByb2ZpbGVzLnYxLkxpc3RSZXNwb25zZSIAMAESUQoGRGVsZXRlEiEuc2hhcmVkLnByb2ZpbGVzLnYxLkRlbGV0ZVJlcXVlc3QaIi5zaGFyZWQucHJvZmlsZXMudjEuRGVsZXRlUmVzcG9uc2UiABJyChFEZWxldGVEYXRhU3ViamVjdBIsLnNoYXJlZC5wcm9maWxlcy52MS5EZWxldGVEYXRhU3ViamVjdFJlcXVlc3QaLS5zaGFyZWQucHJvZmlsZXMudjEuRGVsZXRlRGF0YVN1YmplY3RSZXNwb25zZSIAEnUKEkdldERlbGV0aW9uUmVxdWVzdBItLnNoYXJlZC5wcm9maWxlcy52MS5HZXREZWxldGlvblJlcXVlc3RSZXF1ZXN0Gi4uc2hhcmVkLnByb2ZpbGVzLnYxLkdldERlbGV0aW9uUmVxdWVzdFJlc3BvbnNlIgBCSFpGZ2l0aHViLmNvbS9wdWctc2gvcHVnL2ludGVybmFsL2dlbi9wcm90by9zaGFyZWQvcHJvZmlsZXMvdjE7cHJvZmlsZXN2MWIIZWRpdGlvbnNw6Ac", [file_buf_validate_validate, file_common_v1_filters, file_google_protobuf_struct, file_google_protobuf_timestamp]);
 
 /**
  * @generated from message shared.profiles.v1.DeleteRequest
@@ -290,6 +290,9 @@ export const FilterGroupSchema: GenMessage<FilterGroup> = /*@__PURE__*/
 export type ListRequest = Message<"shared.profiles.v1.ListRequest"> & {
   /**
    * Opaque cursor from a previous response's next_page_token. Empty for the first page.
+   * A token is bound to the sort it was issued under, since the seek predicate is
+   * built from the ordering column; send the same sort back, or restart from an
+   * empty token to change it.
    *
    * @generated from field: string page_token = 1;
    */
@@ -308,13 +311,21 @@ export type ListRequest = Message<"shared.profiles.v1.ListRequest"> & {
   /**
    * Optional. Traffic tagged as automated at ingest ($bot: crawler user agents
    * and datacenter networks) is EXCLUDED by default. Set true to include bots.
-   * A derived anonymous person's create_time — the sort and cursor key — is
-   * computed after this filter, so changing it mid-pagination skips rows. Keep it
-   * constant for a page_token run and restart from an empty token to flip it.
+   * The sort key (first or last seen, or a derived anonymous person's
+   * create_time, which is its first event) is computed after this filter, so
+   * changing it mid-pagination skips rows. Keep it constant for a page_token run
+   * and restart from an empty token to flip it.
    *
    * @generated from field: bool include_bots = 4;
    */
   includeBots: boolean;
+
+  /**
+   * Optional. Defaults to PROFILE_LIST_SORT_CREATE_TIME.
+   *
+   * @generated from field: shared.profiles.v1.ProfileListSort sort = 5;
+   */
+  sort: ProfileListSort;
 };
 
 /**
@@ -419,7 +430,7 @@ export type ProfileActivitySummary = Message<"shared.profiles.v1.ProfileActivity
 
   /**
    * True when EVERY event counted in this summary was tagged as automated at
-   * ingest ($bot) — a crawler, not a user with one tagged event. Only ever true
+   * ingest ($bot): a crawler, not a user with one tagged event. Only ever true
    * on a read that set include_bots, since bot traffic is otherwise excluded.
    *
    * @generated from field: bool bot = 14;
@@ -520,6 +531,59 @@ export enum ComplianceRequestStatus {
  */
 export const ComplianceRequestStatusSchema: GenEnum<ComplianceRequestStatus> = /*@__PURE__*/
   enumDesc(file_shared_profiles_v1_profiles, 0);
+
+/**
+ * ProfileListSort names the ordering of List. Ordering is always descending
+ * (newest or most recently active first), with the person id breaking ties.
+ *
+ * @generated from enum shared.profiles.v1.ProfileListSort
+ */
+export enum ProfileListSort {
+  /**
+   * Defaults to PROFILE_LIST_SORT_CREATE_TIME.
+   *
+   * @generated from enum value: PROFILE_LIST_SORT_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * Profile.create_time: when an identified profile was created, or a derived
+   * anonymous person's first event. A backfilled older event moves the latter
+   * earlier, which can return that person twice in one pass.
+   *
+   * @generated from enum value: PROFILE_LIST_SORT_CREATE_TIME = 1;
+   */
+  CREATE_TIME = 1,
+
+  /**
+   * ProfileActivitySummary.first_seen. A person with no recorded activity sorts as
+   * if seen at the epoch. First seen usually moves earlier mid-pagination, when an
+   * identify merges older anonymous history or an older event is backfilled. That
+   * can return the person twice on that pass. It moves later when a person gets
+   * their first event, or when an anonymous id is identified as another user and
+   * its history leaves the profile. That can miss the person on that pass.
+   *
+   * @generated from enum value: PROFILE_LIST_SORT_FIRST_SEEN = 2;
+   */
+  FIRST_SEEN = 2,
+
+  /**
+   * ProfileActivitySummary.last_seen. A person with no recorded activity sorts as
+   * if seen at the epoch. A person who becomes active mid-pagination moves above
+   * the cursor and is not returned on that pass; restart from an empty token to
+   * see them. Last seen moves earlier when an anonymous id is identified as another
+   * user and its history leaves the profile, which can return the person twice.
+   *
+   * @generated from enum value: PROFILE_LIST_SORT_LAST_SEEN = 3;
+   */
+  LAST_SEEN = 3,
+}
+
+/**
+ * Describes the enum shared.profiles.v1.ProfileListSort.
+ */
+export const ProfileListSortSchema: GenEnum<ProfileListSort> = /*@__PURE__*/
+  enumDesc(file_shared_profiles_v1_profiles, 1);
 
 /**
  * @generated from service shared.profiles.v1.ProfilesService

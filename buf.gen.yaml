@@ -3,7 +3,7 @@
 # Output is committed to src/gen and compiled by tsc like the rest of src/.
 #
 # google/protobuf/* resolve from @bufbuild/protobuf/wkt at runtime and are not emitted.
-# buf/validate/* IS emitted — the pug protos import its field-option extensions
+# buf/validate/* IS emitted; the pug protos import its field-option extensions
 # (file_buf_validate_validate) via a relative path, so it must be generated alongside.
 version: v2
 clean: true
