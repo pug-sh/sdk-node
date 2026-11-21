@@ -102,8 +102,8 @@ export class Pug {
   // --- ingestion (never throws) --------------------------------------------
 
   /**
-   * Enqueue an event for `distinctId`. Non-blocking and throw-free: invalid input and a
-   * closed client are logged and dropped, never thrown.
+   * Enqueue an event for `distinctId`. Never waits on the network and never throws: invalid
+   * input and a closed client are logged and dropped.
    */
   track: TrackFn = (distinctId: string, kind: string, props?: Record<string, JsonValue>, opts?: TrackOptions): void => {
     try {
@@ -137,8 +137,8 @@ export class Pug {
 
   /**
    * Queue a create-or-update of the profile for `externalId`; traits are shallow-merged into the
-   * stored ones. Non-blocking and throw-free like `track()`: identifies are sent in batches, and
-   * invalid input is logged and dropped.
+   * stored ones. Like `track()`, it never waits on the network and never throws: identifies are
+   * sent in batches, and invalid input is logged and dropped.
    */
   identify(externalId: string, traits?: Record<string, JsonValue>, opts?: IdentifyOptions): void {
     try {
