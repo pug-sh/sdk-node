@@ -53,8 +53,8 @@ await pug.close()
 ## Behaviour
 
 - **Ingestion never throws.** `track()` and `identify()` validate input client-side and log +
-  drop on bad input. Both are non-blocking: events and identifies each have a queue that flushes
-  by size (`maxSize`) or interval (`maxWaitMs`).
+  drop on bad input. Neither waits on the network: events and identifies each have a queue that
+  flushes by size (`maxSize`) or interval (`maxWaitMs`).
 - **Delivery is best-effort with retry.** Transient send failures keep events and identifies
   queued and retry; permanent failures (a fixed set of client-error gRPC codes, plus any
   non-transport error) dead-letter via `onError`. `close()` drains and reports anything still
@@ -90,9 +90,9 @@ new Pug({
 
 ### Ingestion (never throws)
 
-- `pug.track(distinctId, kind, props?, options?)`: enqueue an event. Non-blocking.
+- `pug.track(distinctId, kind, props?, options?)`: enqueue an event. Never waits on the network.
 - `pug.identify(externalId, traits?, options?)`: queue a create-or-update of a profile; traits
-  are shallow-merged into the stored ones. Non-blocking.
+  are shallow-merged into the stored ones. Never waits on the network.
 - `pug.flush()`: send the queued events and identifies now.
 - `pug.close()`: drain and shut down; call on graceful exit so nothing queued is lost.
 
