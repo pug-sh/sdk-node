@@ -1,7 +1,7 @@
 {
   "name": "@pug-sh/node",
   "version": "0.1.0",
-  "description": "Pug server-side SDK for Node.js: event tracking, profile identify, and analytics reads.",
+  "description": "Open-source product analytics SDK for Node.js: server-side event tracking, profile identify, and reads of profiles, activity and insights.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -19,7 +19,7 @@
   "engines": {
     "node": ">=18"
   },
-  "homepage": "https://pug.sh",
+  "homepage": "https://pug.sh/integrations/nodejs",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/pug-sh/sdk-node.git"
@@ -49,9 +49,20 @@
     "uuidv7": "^1.1.0"
   },
   "keywords": [
+    "product-analytics",
     "analytics",
+    "event-tracking",
     "tracking",
+    "events",
+    "server-side-tracking",
+    "server-side",
+    "identify",
+    "node",
+    "nodejs",
+    "typescript",
     "sdk",
+    "open-source",
+    "self-hosted",
     "pug"
   ],
   "author": "pug.sh",
