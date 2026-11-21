@@ -1,6 +1,6 @@
 {
   "name": "@pug-sh/node",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Open-source product analytics SDK for Node.js: server-side event tracking, profile identify, and reads of profiles, activity and insights.",
   "type": "module",
   "main": "dist/index.js",
