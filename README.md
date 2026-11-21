@@ -4,7 +4,8 @@
 
 # @pug-sh/node
 
-Pug server-side SDK for Node.js: event tracking, profile identify, and analytics reads.
+Open-source product analytics SDK for Node.js, from [Pug](https://pug.sh): server-side event
+tracking, profile identify, and reads of profiles, activity, and insights.
 
 It is instance-based and authenticates with a **private** project API key (`prv_…`). Ingestion
 never throws, so a tracking call can't take down your request path.
