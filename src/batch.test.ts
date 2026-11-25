@@ -288,6 +288,7 @@ describe('createBatchedTransport', () => {
     await t.flush()
     expect(send).toHaveBeenCalledTimes(1)
     expect(errors).toEqual([{ err: refused, events: [ev(2)] }])
+    expect(err).toHaveBeenCalledWith('[Pug SDK] Permanent error, 1 event dropped (will NOT retry):', 'refused')
     err.mockRestore()
   })
 

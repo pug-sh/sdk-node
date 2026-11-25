@@ -173,7 +173,9 @@ export const createBatchedTransport = <T>(
         unsent = thrown.items as T[]
       }
       if (isPermanentError(err)) {
-        log.error(`Permanent error, ${count(unsent.length)} dropped (will NOT retry):`, err)
+        // Logged whole, a RefusedError would print the refused payloads in its items.
+        const reason = err instanceof RefusedError ? err.message : err
+        log.error(`Permanent error, ${count(unsent.length)} dropped (will NOT retry):`, reason)
         safeOnError(err, unsent)
         return null
       }
