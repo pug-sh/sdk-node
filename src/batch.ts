@@ -44,6 +44,17 @@ export class PartialSendError extends Error {
   }
 }
 
+/** Thrown by a sink whose server took the batch but refused `items` in it, which a retry can't deliver. */
+export class RefusedError extends Error {
+  readonly items: unknown[]
+
+  constructor(items: unknown[], message: string) {
+    super(message)
+    this.name = 'RefusedError'
+    this.items = items
+  }
+}
+
 export interface ItemNames {
   readonly one: string
   readonly many: string
@@ -158,9 +169,13 @@ export const createBatchedTransport = <T>(
       if (thrown instanceof PartialSendError) {
         err = thrown.cause
         unsent = chunk.slice(thrown.sent)
+      } else if (thrown instanceof RefusedError) {
+        unsent = thrown.items as T[]
       }
       if (isPermanentError(err)) {
-        log.error(`Permanent error, ${count(unsent.length)} dropped (will NOT retry):`, err)
+        // Logged whole, a RefusedError would print the refused payloads in its items.
+        const reason = err instanceof RefusedError ? err.message : err
+        log.error(`Permanent error, ${count(unsent.length)} dropped (will NOT retry):`, reason)
         safeOnError(err, unsent)
         return null
       }

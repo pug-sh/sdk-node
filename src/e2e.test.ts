@@ -63,6 +63,27 @@ it('close() delivers queued events, and identifies in one BatchIdentify call', a
   expect(apiKeys).toEqual(['prv_test'])
 })
 
+it('sends a well-known Duration field and a custom Duration property as durationValue', async () => {
+  const events: Event[] = []
+  const pug = await startServer(router => {
+    router.service(EventsService, {
+      batchCreate: req => {
+        events.push(...req.events)
+        return { accepted: req.events.length }
+      },
+    })
+  })
+
+  pug.track('user_1', 'video_play', { videoId: 'v1', position: { seconds: 90, nanos: 500_000_000 } })
+  pug.track('user_1', 'my.custom', { watched: { seconds: 12 } })
+  await pug.close()
+
+  expect(events.map(e => e.customProperties.position?.value ?? e.customProperties.watched?.value)).toEqual([
+    { case: 'durationValue', value: expect.objectContaining({ seconds: 90n, nanos: 500_000_000 }) },
+    { case: 'durationValue', value: expect.objectContaining({ seconds: 12n, nanos: 0 }) },
+  ])
+})
+
 it('sends one Identify call per item to a server without BatchIdentify', async () => {
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
   const identified: IdentifyRequest[] = []

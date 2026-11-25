@@ -59,6 +59,9 @@ await pug.close()
   queued and retry; permanent failures (a fixed set of client-error gRPC codes, plus any
   non-transport error) dead-letter via `onError`. `close()` drains and reports anything still
   undelivered through `onError`.
+- **The server checks each event and identify on its own.** It refuses one that breaks a rule and
+  keeps the rest of the batch, and the SDK passes the refused ones to `onError`, with the server's
+  reasons for the first three. A server before v0.0.55 refuses the whole batch instead.
 - **Identifies go out with `BatchIdentify`.** A server that predates it gets one `Identify` call
   per identify instead.
 - **Reads are request/response and do throw** `PugError`. They run in your control flow, so you
@@ -101,7 +104,19 @@ new Pug({
 `identify` options: `anonymousId` (must start with `anon-`; triggers anon→identified merge),
 `deviceId`. A trait holding `NaN` or `Infinity` is skipped with a warning, as `track()` skips such
 a property; the server would store it as a string. An event or identify over 900 KiB is dropped at
-the call, to stay clear of the server's 1 MiB message limit.
+the call, to stay clear of the server's 1 MiB message limit. `distinctId` and `externalId` must not
+start with `cookieless-` or `crawler-`, which the server reserves for ids it derives itself; such a
+call is logged and dropped.
+
+A property holding an object of nothing but `seconds` and `nanos`, such as
+`{ seconds: 12, nanos: 500_000_000 }`, is sent as a duration, and the well-known Duration fields
+(media positions, a call's length, a mute's length) take the same object. One that isn't a valid
+Duration, such as `{ seconds: 1.5 }` or `{ seconds: null }`, is logged and dropped, and in a
+well-known field it takes the whole event with it. The server stores a duration as a number of
+seconds, so it can be summed and averaged. A `Date` is sent as a timestamp, and any other object or
+array as JSON text. A self-hosted server and events worker must be at v0.0.65 or later to accept a
+duration: an older server refuses the event (before v0.0.55, its whole batch), and an older events
+worker sends the whole batch to its dead-letter queue.
 
 Pug only derives geo from CDN headers on browser (public-key) requests. This SDK uses a
 private key, so the server adds no geo of its own; without `location`, an event has no geo

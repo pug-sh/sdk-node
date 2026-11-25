@@ -115,11 +115,6 @@ export class Pug {
         log.error('track() requires a non-empty distinctId string.')
         return
       }
-      // The server rejects a whole batch over one such id, taking other users' events with it.
-      if (distinctId.startsWith('cookieless-')) {
-        log.error("track() distinctId must not start with the reserved 'cookieless-' prefix.")
-        return
-      }
       const event = toEvent(kind, opts?.sessionId ?? this.sessionId, distinctId, props, opts)
       if (!event) {
         return // toEvent already logged the reason

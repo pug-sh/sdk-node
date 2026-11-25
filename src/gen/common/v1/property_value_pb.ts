@@ -5,15 +5,15 @@
 import type { GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_buf_validate_validate } from "../../buf/validate/validate_pb.js";
-import type { Timestamp } from "@bufbuild/protobuf/wkt";
-import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
+import type { Duration, Timestamp } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_duration, file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file common/v1/property_value.proto.
  */
 export const file_common_v1_property_value: GenFile = /*@__PURE__*/
-  fileDesc("Ch5jb21tb24vdjEvcHJvcGVydHlfdmFsdWUucHJvdG8SCWNvbW1vbi52MSLEAQoNUHJvcGVydHlWYWx1ZRIgCgxzdHJpbmdfdmFsdWUYASABKAlCCLpIBXIDGIAISAASEwoJaW50X3ZhbHVlGAIgASgDSAASHwoMZG91YmxlX3ZhbHVlGAMgASgBQge6SAQSAkABSAASFAoKYm9vbF92YWx1ZRgEIAEoCEgAEjUKD3RpbWVzdGFtcF92YWx1ZRgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBIAEIOCgV2YWx1ZRIFukgCCAFCPVo7Z2l0aHViLmNvbS9wdWctc2gvcHVnL2ludGVybmFsL2dlbi9wcm90by9jb21tb24vdjE7Y29tbW9udjFiCGVkaXRpb25zcOgH", [file_buf_validate_validate, file_google_protobuf_timestamp]);
+  fileDesc("Ch5jb21tb24vdjEvcHJvcGVydHlfdmFsdWUucHJvdG8SCWNvbW1vbi52MSL5AQoNUHJvcGVydHlWYWx1ZRIgCgxzdHJpbmdfdmFsdWUYASABKAlCCLpIBXIDGIAISAASEwoJaW50X3ZhbHVlGAIgASgDSAASHwoMZG91YmxlX3ZhbHVlGAMgASgBQge6SAQSAkABSAASFAoKYm9vbF92YWx1ZRgEIAEoCEgAEjUKD3RpbWVzdGFtcF92YWx1ZRgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBIABIzCg5kdXJhdGlvbl92YWx1ZRgGIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbkgAQg4KBXZhbHVlEgW6SAIIAUI9WjtnaXRodWIuY29tL3B1Zy1zaC9wdWcvaW50ZXJuYWwvZ2VuL3Byb3RvL2NvbW1vbi92MTtjb21tb252MWIIZWRpdGlvbnNw6Ac", [file_buf_validate_validate, file_google_protobuf_duration, file_google_protobuf_timestamp]);
 
 /**
  * PropertyValue is the typed value of an event property.
@@ -21,9 +21,11 @@ export const file_common_v1_property_value: GenFile = /*@__PURE__*/
  * oneof.required option below.
  *
  * Lists, objects, and other compound types are intentionally not included
- * in this iteration — only the five primitive types supported by the
- * ClickHouse Variant storage target. New variants can be added later as
- * additive oneof entries (wire-compatible).
+ * in this iteration: only primitive types the ClickHouse Variant storage
+ * target can hold. A server older than a oneof case sees no case set and
+ * drops the event, and a server before v0.0.55 rejects the whole batch. An
+ * events worker older than the case, behind a newer server, sends the whole
+ * batch to the DLQ. So SDKs must not send a case their deployment predates.
  *
  * @generated from message common.v1.PropertyValue
  */
@@ -38,8 +40,8 @@ export type PropertyValue = Message<"common.v1.PropertyValue"> & {
      * upstream rather than embedded as a property value. Note: max_len
      * counts codepoints, not bytes — multi-byte UTF-8 (emoji, CJK) can
      * exceed 1 KiB on the wire at this limit. Switch to max_bytes if a
-     * hard byte cap is required. Values exceeding the limit are rejected
-     * at the validate interceptor with CodeInvalidArgument (not truncated).
+     * hard byte cap is required. An event with a longer value is dropped
+     * as invalid_event, not truncated.
      *
      * Empty-string note: the filter expression cannot distinguish a
      * custom_properties value of "" from an absent key — both project to ''
@@ -79,6 +81,15 @@ export type PropertyValue = Message<"common.v1.PropertyValue"> & {
      */
     value: Timestamp;
     case: "timestampValue";
+  } | {
+    /**
+     * Stored as seconds in the Float64 Variant slot, like double_value, so
+     * SUM, AVG and numeric filters work on it.
+     *
+     * @generated from field: google.protobuf.Duration duration_value = 6;
+     */
+    value: Duration;
+    case: "durationValue";
   } | { case: undefined; value?: undefined };
 };
 

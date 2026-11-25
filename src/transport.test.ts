@@ -2,14 +2,43 @@ import { create } from '@bufbuild/protobuf'
 import { Code, ConnectError } from '@connectrpc/connect'
 import { describe, expect, it, vi } from 'vitest'
 import { PartialSendError } from './batch.js'
-import { type IdentifyRequest, IdentifyRequestSchema } from './gen/sdk/profiles/v1/profiles_pb.js'
+import { BatchCreateResponseSchema, EventSchema } from './gen/sdk/events/v1/events_pb.js'
+import {
+  BatchIdentifyResponseSchema,
+  type IdentifyRequest,
+  IdentifyRequestSchema,
+} from './gen/sdk/profiles/v1/profiles_pb.js'
 import { createEventSink, createIdentifySink } from './transport.js'
 
-it('warns with the reasons when the server drops events', async () => {
+it('warns with the reasons when the server drops events it does not name', async () => {
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-  const batchCreate = async () => ({ accepted: 1, dropped: 2, droppedByReason: { day_out_of_range: 2 } })
-  await createEventSink({ batchCreate } as never).sendBatch([{}, {}, {}] as never)
-  expect(warn).toHaveBeenCalledWith(expect.stringContaining('dropped 2 of 3'), { day_out_of_range: 2 })
+  const batchCreate = async () =>
+    create(BatchCreateResponseSchema, { accepted: 1, dropped: 3, droppedByReason: { a_reason: 2, b_reason: 1 } })
+  await createEventSink({ batchCreate } as never).sendBatch([{}, {}, {}, {}] as never)
+  expect(warn).toHaveBeenCalledWith('[Pug SDK] Server dropped 3 of 4 event(s): 2 a_reason, 1 b_reason.')
+  warn.mockRestore()
+})
+
+it('throws the events the server refused, naming the first three', async () => {
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  const batchCreate = async () =>
+    create(BatchCreateResponseSchema, {
+      accepted: 2,
+      dropped: 4,
+      droppedByReason: { invalid_event: 4 },
+      invalidEvents: [
+        { index: 0, violations: ['v1', 'v2'] },
+        { index: 2, violations: ['v3'] },
+        { index: 3, violations: ['v4'] },
+        { index: 4, violations: ['v5'] },
+      ],
+    })
+  const batch = ['a', 'b', 'c', 'd', 'e', 'f'].map(kind => create(EventSchema, { kind }))
+  await expect(createEventSink({ batchCreate } as never).sendBatch(batch)).rejects.toMatchObject({
+    items: [batch[0], batch[2], batch[3], batch[4]],
+    message: 'Server refused 4 of 6 event(s): "a": v1; v2 | "c": v3 | "d": v4 | and 1 more',
+  })
+  expect(warn).not.toHaveBeenCalled()
   warn.mockRestore()
 })
 
@@ -18,11 +47,21 @@ describe('createIdentifySink', () => {
   const unimplemented = () => Promise.reject(new ConnectError('no such procedure', Code.Unimplemented))
 
   it('sends a batch with one BatchIdentify call', async () => {
-    const batchIdentify = vi.fn(async () => ({ accepted: 2 }))
+    const batchIdentify = vi.fn(async () => create(BatchIdentifyResponseSchema, { accepted: 2 }))
     const identify = vi.fn()
     await createIdentifySink({ batchIdentify, identify } as never).sendBatch(identifies('u1', 'u2'))
     expect(batchIdentify).toHaveBeenCalledWith(expect.objectContaining({ identifies: identifies('u1', 'u2') }))
     expect(identify).not.toHaveBeenCalled()
+  })
+
+  it('throws the identifies BatchIdentify refused', async () => {
+    const batchIdentify = async () =>
+      create(BatchIdentifyResponseSchema, { accepted: 1, invalidIdentifies: [{ index: 1, violations: ['v1'] }] })
+    const batch = identifies('u1', 'u2')
+    await expect(createIdentifySink({ batchIdentify } as never).sendBatch(batch)).rejects.toMatchObject({
+      items: [batch[1]],
+      message: 'Server refused 1 of 2 identifies: "u2": v1',
+    })
   })
 
   it('falls back to one Identify call each, for good, on a server without BatchIdentify', async () => {
