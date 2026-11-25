@@ -164,14 +164,14 @@ describe('Pug', () => {
     expect(sent[0]?.occurTime).toMatchObject({ seconds: 0n })
   })
 
-  it("track() drops a distinctId with the reserved 'cookieless-' prefix", () => {
+  it.each(['cookieless-', 'crawler-'])("track() drops a distinctId with the reserved '%s' prefix", prefix => {
     const err = vi.spyOn(console, 'error').mockImplementation(() => {})
     const pug = newClient()
     const sent: unknown[] = []
     ;(pug as unknown as { eventQueue: unknown }).eventQueue = { send: (e: never) => sent.push(e) }
-    pug.track('cookieless-abc', 'my.custom')
+    pug.track(`${prefix}abc`, 'my.custom')
     expect(sent).toHaveLength(0)
-    expect(err).toHaveBeenCalledWith(expect.stringContaining("reserved 'cookieless-' prefix"))
+    expect(err).toHaveBeenCalledWith(expect.any(String), expect.stringContaining(`reserved '${prefix}' prefix`))
     err.mockRestore()
   })
 
@@ -189,10 +189,13 @@ describe('Pug', () => {
     err.mockRestore()
   })
 
-  it("identify() rejects an externalId with the reserved 'cookieless-' prefix", () => {
+  it.each(['cookieless-', 'crawler-'])("identify() rejects an externalId with the reserved '%s' prefix", prefix => {
     const err = vi.spyOn(console, 'error').mockImplementation(() => {})
-    newClient().identify('cookieless-abc')
-    expect(err).toHaveBeenCalledWith(expect.stringContaining("reserved 'cookieless-' prefix"))
+    const pug = newClient()
+    const queued = queuedIdentifies(pug)
+    pug.identify(`${prefix}abc`)
+    expect(queued).toHaveLength(0)
+    expect(err).toHaveBeenCalledWith(expect.stringContaining(`reserved '${prefix}' prefix`))
     err.mockRestore()
   })
 

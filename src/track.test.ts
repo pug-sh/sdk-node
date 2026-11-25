@@ -1,3 +1,5 @@
+import { create } from '@bufbuild/protobuf'
+import { DurationSchema, durationFromMs } from '@bufbuild/protobuf/wkt'
 import { uuidv7 } from 'uuidv7'
 import { describe, expect, it, vi } from 'vitest'
 import { type EventLocation, toEvent } from './track.js'
@@ -40,6 +42,60 @@ describe('toEvent (custom events)', () => {
     const e = toEvent('my.custom', SESSION, 'user_1', { bad: Number.POSITIVE_INFINITY, good: 'x' })
     expect(e?.customProperties.bad).toBeUndefined()
     expect(e?.customProperties.good?.value.case).toBe('stringValue')
+  })
+
+  it('sends an object of nothing but seconds and nanos, or a Duration, as a durationValue', () => {
+    const e = toEvent('my.custom', SESSION, 'user_1', {
+      watched: { seconds: 90, nanos: 500_000_000 },
+      lag: { seconds: -1, nanos: 500_000_000 },
+      max: { seconds: 315_576_000_000, nanos: 999_999_999 },
+      timer: durationFromMs(2_000),
+    })
+    const duration = (seconds: bigint, nanos: number) => ({
+      case: 'durationValue',
+      value: create(DurationSchema, { seconds, nanos }),
+    })
+    expect(e?.customProperties.watched?.value).toEqual(duration(90n, 500_000_000))
+    expect(e?.customProperties.lag?.value).toEqual(duration(0n, -500_000_000))
+    expect(e?.customProperties.max?.value).toEqual(duration(315_576_000_000n, 999_999_999))
+    expect(e?.customProperties.timer?.value).toEqual(duration(2n, 0))
+  })
+
+  it('sends a normalized copy of a Duration message', () => {
+    const timer = create(DurationSchema, { seconds: 1n, nanos: 1_500_000_000 })
+    const e = toEvent('my.custom', SESSION, 'user_1', { timer })
+    timer.seconds = 99n
+    expect(e?.customProperties.timer?.value.value).toEqual(create(DurationSchema, { seconds: 2n, nanos: 500_000_000 }))
+  })
+
+  it('keeps an object with any other key, or none, as JSON text', () => {
+    const e = toEvent('my.custom', SESSION, 'user_1', { timer: { seconds: 5, label: 'x' }, empty: {} })
+    expect(e?.customProperties.timer?.value).toEqual({ case: 'stringValue', value: '{"seconds":5,"label":"x"}' })
+    expect(e?.customProperties.empty?.value).toEqual({ case: 'stringValue', value: '{}' })
+  })
+
+  it.each([
+    [{ seconds: '5' }, 'seconds: expected int64, got string'],
+    [{ seconds: 1.5 }, 'seconds: expected a safe integer, got 1.5'],
+    [{ nanos: 0.5 }, expect.stringMatching(/^nanos: /)],
+    [{ seconds: 315_576_000_001 }, 'expected a Duration within ±10,000 years'],
+    [{ seconds: -315_576_000_000, nanos: -1_000_000_000 }, 'expected a Duration within ±10,000 years'],
+    [{ seconds: null }, 'seconds and nanos must not be null or undefined'],
+    [{ seconds: 5, nanos: undefined }, 'seconds and nanos must not be null or undefined'],
+  ])('drops a Duration property %o and keeps the event', (timer, reason) => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const e = toEvent('my.custom', SESSION, 'user_1', { timer, good: 'x' })
+    expect(e?.customProperties.timer).toBeUndefined()
+    expect(e?.customProperties.good?.value.case).toBe('stringValue')
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('not a valid Duration'), reason)
+    warn.mockRestore()
+  })
+
+  it("drops a crawler_request event, which only the server's crawler collector shape passes", () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect(toEvent('crawler_request', SESSION, 'user_1')).toBeNull()
+    expect(err).toHaveBeenCalledWith(expect.any(String), expect.stringContaining('incoming_event.crawler_request'))
+    err.mockRestore()
   })
 })
 
@@ -119,16 +175,51 @@ describe('well-known events', () => {
   })
 
   it.each([
-    [{ seconds: 0 }, '0s'],
-    [{ seconds: 0, nanos: 500_000_000 }, '0.5s'],
-    [{ seconds: 1, nanos: 5_000_000 }, '1.005s'],
-    [{ seconds: 90 }, '90s'],
-    [{ seconds: 90, nanos: 500_000_000 }, '90.5s'],
-    [{ seconds: 1, nanos: -500_000_000 }, '0.5s'],
-    [{ seconds: 1, nanos: 1_000_000_000 }, '2s'],
-  ])('sends Duration %j as "%s"', (position, wire) => {
+    [{ seconds: 0 }, 0, 0],
+    [{ nanos: 500_000_000 }, 0, 500_000_000],
+    [{ seconds: 1, nanos: 5_000_000 }, 1, 5_000_000],
+    [{ seconds: 90 }, 90, 0],
+    [{ seconds: 1, nanos: -500_000_000 }, 0, 500_000_000],
+    [{ seconds: 1, nanos: 1_500_000_000 }, 2, 500_000_000],
+  ])('sends Duration %j as a durationValue of %is %ins', (position, seconds, nanos) => {
     const e = toEvent('video_play', SESSION, 'user_1', { videoId: 'v1', position })
-    expect(e?.customProperties.position?.value).toEqual({ case: 'stringValue', value: wire })
+    expect(e?.customProperties.position?.value).toEqual({
+      case: 'durationValue',
+      value: create(DurationSchema, { seconds: BigInt(seconds), nanos }),
+    })
+  })
+
+  it('does not share a Duration message with the caller', () => {
+    const position = durationFromMs(1_500)
+    const e = toEvent('video_play', SESSION, 'user_1', { videoId: 'v1', position })
+    position.seconds = 99n
+    expect(e?.customProperties.position?.value.value).toEqual(
+      create(DurationSchema, { seconds: 1n, nanos: 500_000_000 }),
+    )
+  })
+
+  // protovalidate compares seconds first, so it would pass this unnormalized.
+  it('drops the event when a Duration adds up to less than 0s', () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const position = { seconds: 1, nanos: -1_500_000_000 }
+    expect(toEvent('video_play', SESSION, 'user_1', { videoId: 'v1', position })).toBeNull()
+    expect(err).toHaveBeenCalledWith(expect.any(String), expect.stringContaining('position: must be greater than'))
+    err.mockRestore()
+  })
+
+  it('drops the event when a Duration is past 10,000 years', () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const position = { seconds: 315_576_000_001 }
+    expect(toEvent('video_play', SESSION, 'user_1', { videoId: 'v1', position })).toBeNull()
+    expect(err).toHaveBeenCalledWith(expect.any(String), 'position: expected a Duration within ±10,000 years')
+    err.mockRestore()
+  })
+
+  it.each([null, undefined])('drops the event when a Duration member is %s', seconds => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect(toEvent('video_play', SESSION, 'user_1', { videoId: 'v1', position: { seconds } })).toBeNull()
+    expect(err).toHaveBeenCalledWith(expect.any(String), 'position: seconds and nanos must not be null or undefined')
+    err.mockRestore()
   })
 
   it.each([[90], ['90s'], [{ ms: 90_000 }], [new Date(90_000)]])('drops the event when a Duration is %j', position => {

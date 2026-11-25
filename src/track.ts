@@ -17,7 +17,7 @@ import {
 import { createValidator } from '@bufbuild/protovalidate'
 import { uuidv7 } from 'uuidv7'
 import { type PropertyValue, PropertyValueSchema } from './gen/common/v1/property_value_pb.js'
-import { type Event, EventSchema } from './gen/sdk/events/v1/events_pb.js'
+import { type Event, EventSchema, IncomingEventSchema } from './gen/sdk/events/v1/events_pb.js'
 import { log } from './logger.js'
 import { isPlainObject } from './utils.js'
 import { SDK_VERSION } from './version.js'
@@ -81,7 +81,8 @@ const makeStringValue = (raw: string): PropertyValue => {
  * Maps an untyped JS value to a PropertyValue oneof. Returns null when the value cannot
  * be represented; the caller omits the property.
  *   string → stringValue (truncated) · boolean → boolValue · number → int/double
- *   bigint → intValue · Date → timestampValue · object/array → JSON string · null/undefined → drop
+ *   bigint → intValue · Date → timestampValue · Duration or { seconds, nanos } → durationValue
+ *   other object/array → JSON string · null/undefined → drop
  */
 const jsValueToPropertyValue = (v: unknown): PropertyValue | null => {
   if (v === null || v === undefined) {
@@ -115,6 +116,9 @@ const jsValueToPropertyValue = (v: unknown): PropertyValue | null => {
   if (typeof v === 'object') {
     let json: string
     try {
+      if (isDurationInit(v)) {
+        return makeDurationValue(v)
+      }
       json = JSON.stringify(v)
     } catch (err) {
       // Circular reference, nested bigint, throwing toJSON, etc. The caller logs a generic
@@ -163,18 +167,8 @@ const scalarToPropertyValue = (v: ScalarValue, scalar: ScalarType): PropertyValu
   }
 }
 
-// options.proto's wire form for a Duration is "1.5s", not toJson()'s "1.500s". Summing first fixes nanos
-// that are out of range or signed against seconds. Every Duration field is gte 0s, so it's never negative.
-const formatDuration = ({ seconds, nanos }: Duration): string => {
-  const total = seconds * 1_000_000_000n + BigInt(nanos)
-  const fraction = String(total % 1_000_000_000n)
-    .padStart(9, '0')
-    .replace(/0+$/, '')
-  return `${total / 1_000_000_000n}${fraction ? `.${fraction}` : ''}s`
-}
-
-// create() builds a message out of any object and drops keys it doesn't know, so a Date or
-// `{ ms: 90000 }` would go out as a "0s" Duration.
+// create() builds a message out of any object, dropping keys it doesn't know and skipping null and
+// undefined, so a Date, `{ ms: 90000 }` or `{ seconds: null }` would go out as a zero Duration.
 const checkMessageInits = (schema: DescMessage, data: Record<string, unknown>): void => {
   for (const field of schema.fields) {
     const value = data[field.localName]
@@ -184,6 +178,9 @@ const checkMessageInits = (schema: DescMessage, data: Record<string, unknown>): 
     const keys = field.message.fields.map(f => f.localName)
     if (!isPlainObject(value) || Object.keys(value).some(k => !keys.includes(k))) {
       throw new FieldError(field, `expected a ${field.message.name} ({ ${keys.join(', ')} })`)
+    }
+    if (Object.values(value).some(v => v == null)) {
+      throw new FieldError(field, NULLISH_DURATION)
     }
   }
 }
@@ -226,6 +223,69 @@ const checkTypes = (r: ReflectMessage): void => {
   }
 }
 
+const describeFieldError = (err: unknown): unknown =>
+  isFieldError(err) ? `${err.field().localName}: ${err.message}` : err
+
+const NANOS_PER_SECOND = 1_000_000_000n
+// duration.proto's valid range, about ±10,000 years; the wire and the server would accept more.
+const MAX_DURATION_NANOS = 315_576_000_000n * NANOS_PER_SECOND + 999_999_999n
+const DURATION_OUT_OF_RANGE = 'expected a Duration within ±10,000 years'
+const NULLISH_DURATION = 'seconds and nanos must not be null or undefined'
+
+const normalizeDuration = ({ seconds, nanos }: Duration): Duration | null => {
+  const total = seconds * NANOS_PER_SECOND + BigInt(nanos)
+  if (total > MAX_DURATION_NANOS || total < -MAX_DURATION_NANOS) {
+    return null
+  }
+  return create(DurationSchema, { seconds: total / NANOS_PER_SECOND, nanos: Number(total % NANOS_PER_SECOND) })
+}
+
+// protovalidate's duration.gte compares seconds before nanos, so it passes { seconds: 1, nanos: -1_500_000_000 }.
+// The copy also matters: create() keeps a caller's Duration message as given, and the queued event must not share it.
+const normalizeDurations = (r: ReflectMessage): void => {
+  for (const field of r.fields) {
+    if (field.fieldKind !== 'message' || !r.isSet(field)) {
+      continue
+    }
+    const value = r.get(field).message
+    if (!isMessage(value, DurationSchema)) {
+      continue
+    }
+    const normalized = normalizeDuration(value)
+    if (!normalized) {
+      throw new FieldError(field, DURATION_OUT_OF_RANGE)
+    }
+    r.set(field, reflect(DurationSchema, normalized))
+  }
+}
+
+// No schema says a custom property is a Duration, so the shape does: a Duration message, or an object of
+// nothing but the seconds and nanos a well-known Duration field takes.
+const isDurationInit = (v: object): boolean =>
+  isMessage(v, DurationSchema) ||
+  (isPlainObject(v) && Object.keys(v).length > 0 && Object.keys(v).every(k => k === 'seconds' || k === 'nanos'))
+
+const makeDurationValue = (init: object): PropertyValue | null => {
+  if (Object.values(init).some(v => v == null)) {
+    log.warn('Property value is not a valid Duration, dropping:', NULLISH_DURATION)
+    return null
+  }
+  const { seconds, nanos } = init as { seconds?: unknown; nanos?: unknown }
+  const duration = create(DurationSchema, { seconds, nanos } as MessageInitShape<typeof DurationSchema>)
+  try {
+    checkTypes(reflect(DurationSchema, duration))
+  } catch (err) {
+    log.warn('Property value is not a valid Duration, dropping:', describeFieldError(err))
+    return null
+  }
+  const value = normalizeDuration(duration)
+  if (!value) {
+    log.warn('Property value is not a valid Duration, dropping:', DURATION_OUT_OF_RANGE)
+    return null
+  }
+  return create(PropertyValueSchema, { value: { case: 'durationValue', value } })
+}
+
 type WellKnownValidation<Desc extends DescMessage> =
   | { ok: true; msg: MessageShape<Desc>; extras: Record<string, JsonValue> }
   | { ok: false }
@@ -253,10 +313,11 @@ const validateWellKnownProps = <Desc extends DescMessage>(
   try {
     checkMessageInits(schema, knownData)
     msg = create(schema, knownData as MessageInitShape<Desc>)
-    checkTypes(reflect(schema, msg))
+    const r = reflect(schema, msg)
+    checkTypes(r)
+    normalizeDurations(r)
   } catch (err) {
-    const reason = isFieldError(err) ? `${err.field().localName}: ${err.message}` : err
-    log.error(`Event "${kind}" dropped: invalid properties for "${schema.typeName}":`, reason)
+    log.error(`Event "${kind}" dropped: invalid properties for "${schema.typeName}":`, describeFieldError(err))
     return { ok: false }
   }
 
@@ -286,7 +347,7 @@ const buildKnownPropertyMap = <Desc extends DescMessage>(
     if (field.fieldKind === 'message') {
       const value = r.get(field).message
       if (isMessage(value, DurationSchema)) {
-        out[field.localName] = makeStringValue(formatDuration(value))
+        out[field.localName] = create(PropertyValueSchema, { value: { case: 'durationValue', value } })
         continue
       }
     }
@@ -495,7 +556,9 @@ export const toEvent = (
     return null
   }
 
-  const result = validator.validate(EventSchema, event)
+  // IncomingEvent is never sent: it carries the rules the server checks each event against on arrival,
+  // such as the reserved distinct_id prefixes, on top of Event's own.
+  const result = validator.validate(IncomingEventSchema, create(IncomingEventSchema, { event }))
   if (result.kind !== 'valid') {
     const source = isWellKnownEvent(kind) ? 'well-known' : 'custom'
     log.error(`Event "${kind}" (${source}) failed Event-level validation:`, formatValidationError(result))

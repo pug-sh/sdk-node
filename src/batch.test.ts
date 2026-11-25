@@ -1,6 +1,13 @@
 import { Code, ConnectError } from '@connectrpc/connect'
 import { describe, expect, it, vi } from 'vitest'
-import { createBatchedTransport, IDENTIFY_NAMES, PartialSendError, resolveBatchConfig, type Sink } from './batch.js'
+import {
+  createBatchedTransport,
+  IDENTIFY_NAMES,
+  PartialSendError,
+  RefusedError,
+  resolveBatchConfig,
+  type Sink,
+} from './batch.js'
 
 // biome-ignore lint: tests use opaque stand-in events
 const ev = (id: number) => ({ id }) as any
@@ -264,6 +271,23 @@ describe('createBatchedTransport', () => {
     t.send(ev(3))
     await t.flush()
     expect(errors).toEqual([{ err: refused, events: [ev(2), ev(3)] }])
+    err.mockRestore()
+  })
+
+  it('dead-letters only the items a sink says the server refused, and does not retry', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const refused = new RefusedError([ev(2)], 'refused')
+    const send = vi.fn(async () => {
+      throw refused
+    })
+    const { t, errors } = setup({ config: { maxSize: 99, maxWaitMs: 10_000, maxQueueSize: 99 }, send })
+    t.send(ev(1))
+    t.send(ev(2))
+    t.send(ev(3))
+    await t.flush()
+    await t.flush()
+    expect(send).toHaveBeenCalledTimes(1)
+    expect(errors).toEqual([{ err: refused, events: [ev(2)] }])
     err.mockRestore()
   })
 
