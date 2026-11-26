@@ -3,14 +3,24 @@ updates:
   - package-ecosystem: "bun"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     # Every src/gen file is stamped with the protoc-gen-es version, so these PRs fail
-    # check-codegen until `make protos` is committed onto them. Grouping means doing that once.
+    # check-codegen until `make protos` is committed onto them. Grouping means doing that once:
+    # bufbuild for majors, and bun-minor-patch, which holds every minor and patch update, for the
+    # rest.
     groups:
       bufbuild:
         patterns: ["@bufbuild/*"]
+        update-types: ["major"]
+      bun-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
+    groups:
+      actions-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
